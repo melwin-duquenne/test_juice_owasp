@@ -8,6 +8,11 @@ import { type ChallengeKey } from 'models/challenge'
 
 const FixesDir = 'data/static/codefixes'
 
+// Helper to validate file names (no path traversal)
+function isSafeFileName (name: string): boolean {
+  return /^[a-zA-Z0-9_.-]+$/.test(name)
+}
+
 interface codeFix {
   fixes: string[]
   correct: number
@@ -21,11 +26,15 @@ export const readFixes = (key: string) => {
   if (CodeFixes[key]) {
     return CodeFixes[key]
   }
+  // Only allow safe keys (no path traversal)
+  if (!isSafeFileName(key)) {
+    return { fixes: [], correct: -1 }
+  }
   const files = fs.readdirSync(FixesDir)
   const fixes: string[] = []
   let correct: number = -1
   for (const file of files) {
-    if (file.startsWith(`${key}_`)) {
+    if (file.startsWith(`${key}_`) && isSafeFileName(file)) {
       const fix = fs.readFileSync(`${FixesDir}/${file}`).toString()
       const metadata = file.split('_')
       const number = metadata[1]
@@ -70,6 +79,10 @@ export const serveCodeFixes = () => (req: Request<FixesRequestParams, Record<str
 export const checkCorrectFix = () => async (req: Request<Record<string, unknown>, Record<string, unknown>, VerdictRequestBody>, res: Response, next: NextFunction) => {
   const key = req.body.key
   const selectedFix = req.body.selectedFix
+  // Only allow safe keys (no path traversal)
+  if (!isSafeFileName(key)) {
+    return res.status(400).json({ error: 'Invalid key.' })
+  }
   const fixData = readFixes(key)
   if (fixData.fixes.length === 0) {
     res.status(404).json({

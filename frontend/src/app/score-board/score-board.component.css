@@ -1,0 +1,84 @@
+:host {
+  display: block;
+  margin: 48px 72px;
+}
+@media (max-width: 1500px) {
+  :host {
+    margin: 48px 64px;
+  }
+}
+@media (max-width: 900px) {
+  :host {
+    margin: 48px;
+  }
+}
+@media (max-width: 600px) {
+  :host {
+    margin: 32px 16px;
+  }
+}
+
+.score-row {
+  -moz-column-gap: 16px;
+       column-gap: 16px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  min-height: 120px;
+  row-gap: 8px;
+}
+@media (max-width: 1500px) {
+  .score-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 900px) {
+  .score-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 600px) {
+  .score-row {
+    grid-template-columns: repeat(1, 1fr);
+  }
+}
+
+.challenges {
+  -moz-column-gap: 16px;
+       column-gap: 16px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin-top: 32px;
+  row-gap: 12px;
+}
+@media (max-width: 1500px) {
+  .challenges {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 900px) {
+  .challenges {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 600px) {
+  .challenges {
+    grid-template-columns: repeat(1, 1fr);
+  }
+}
+
+.empty-challenges {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin: 0 32px;
+  min-height: 20vh;
+}
+
+.loading-spinner-wrapper {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  padding: 64px;
+  width: 100%;
+}/*# sourceMappingURL=score-board.component.css.map */

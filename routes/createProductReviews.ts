@@ -19,11 +19,18 @@ export function createProductReviews () {
       () => user?.data?.email !== req.body.author
     )
 
+    // Correction : sanitation des champs message et author
+    const sanitize = (str: string) =>
+      typeof str === 'string' ? str.replace(/<[^>]*>?/gm, '').replace(/["'\\]/g, '') : ''
+
+    const safeMessage = sanitize(req.body.message)
+    const safeAuthor = sanitize(req.body.author)
+
     try {
       await reviewsCollection.insert({
         product: req.params.id,
-        message: req.body.message,
-        author: req.body.author,
+        message: safeMessage,
+        author: safeAuthor,
         likesCount: 0,
         likedBy: []
       })

@@ -58,7 +58,11 @@ describe('LastLoginIpComponent', () => {
   })
 
   xit('should set Last-Login IP from JWT as trusted HTML', () => { // FIXME Expected state seems to leak over from previous test case occasionally
-    localStorage.setItem('token', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7Imxhc3RMb2dpbklwIjoiMS4yLjMuNCJ9fQ.RAkmdqwNypuOxv3SDjPO4xMKvd1CddKvDFYDBfUt3bg')
+    // Le JWT est désormais lu depuis la variable d’environnement TEST_JWT_LAST_LOGIN_IP
+    const jwt = (typeof process !== 'undefined' && process.env && process.env.TEST_JWT_LAST_LOGIN_IP)
+      ? process.env.TEST_JWT_LAST_LOGIN_IP
+      : ''
+    localStorage.setItem('token', jwt)
     component.ngOnInit()
     expect(sanitizer.bypassSecurityTrustHtml).toHaveBeenCalledWith('<small>1.2.3.4</small>')
   })

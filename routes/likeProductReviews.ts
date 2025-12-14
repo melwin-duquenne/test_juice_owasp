@@ -15,11 +15,15 @@ const sleep = async (ms: number) => await new Promise(resolve => setTimeout(reso
 
 export function likeProductReviews () {
   return async (req: Request, res: Response, next: NextFunction) => {
-    const id = req.body.id
+    // Validation de l’id (alphanumérique ou ObjectId)
+    const id = typeof req.body.id === 'string' && /^[a-fA-F0-9]{24}$/.test(req.body.id) ? req.body.id : null
     const user = security.authenticatedUsers.from(req)
-    if (!user) {
-      return res.status(401).json({ error: 'Unauthorized' })
+    if (!user || !id) {
+      return res.status(401).json({ error: 'Unauthorized or invalid id' })
     }
+
+    // Sanitation de l’email utilisateur
+    const safeEmail = typeof user.data.email === 'string' ? user.data.email.replace(/["'\\<>]/g, '') : ''
 
     try {
       const review = await db.reviewsCollection.findOne({ _id: id })
@@ -28,7 +32,7 @@ export function likeProductReviews () {
       }
 
       const likedBy = review.likedBy
-      if (likedBy.includes(user.data.email)) {
+      if (likedBy.includes(safeEmail)) {
         return res.status(403).json({ error: 'Not allowed' })
       }
 
@@ -42,9 +46,9 @@ export function likeProductReviews () {
       try {
         const updatedReview: Review = await db.reviewsCollection.findOne({ _id: id })
         const updatedLikedBy = updatedReview.likedBy
-        updatedLikedBy.push(user.data.email)
+        updatedLikedBy.push(safeEmail)
 
-        const count = updatedLikedBy.filter(email => email === user.data.email).length
+        const count = updatedLikedBy.filter(email => email === safeEmail).length
         challengeUtils.solveIf(challenges.timingAttackChallenge, () => count > 2)
 
         const result = await db.reviewsCollection.update(

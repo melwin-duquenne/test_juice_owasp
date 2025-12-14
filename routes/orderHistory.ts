@@ -12,7 +12,13 @@ export function orderHistory () {
   return async (req: Request, res: Response, next: NextFunction) => {
     const loggedInUser = security.authenticatedUsers.get(req.headers?.authorization?.replace('Bearer ', ''))
     if (loggedInUser?.data?.email && loggedInUser.data.id) {
-      const email = loggedInUser.data.email
+      // Sanitation de l’email et validation de l’id
+      const email = typeof loggedInUser.data.email === 'string' ? loggedInUser.data.email.replace(/["'\\<>]/g, '') : ''
+      const userId = typeof loggedInUser.data.id === 'number' ? loggedInUser.data.id.toString().replace(/[^a-zA-Z0-9]/g, '') : ''
+      if (!email || !userId) {
+        next(new Error('Blocked illegal activity by ' + req.socket.remoteAddress))
+        return
+      }
       const updatedEmail = email.replace(/[aeiou]/gi, '*')
       const order = await ordersCollection.find({ email: updatedEmail })
       res.status(200).json({ status: 'success', data: order })

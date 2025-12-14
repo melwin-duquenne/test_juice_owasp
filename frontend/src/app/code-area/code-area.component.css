@@ -1,0 +1,10 @@
+@import '~highlight.js/styles/vs.css';
+#emphasize {
+  float: left;
+  padding: 1em 0.5em;
+}
+
+.lineMarker {
+  color: #fff;
+  cursor: pointer;
+}/*# sourceMappingURL=code-area.component.css.map */

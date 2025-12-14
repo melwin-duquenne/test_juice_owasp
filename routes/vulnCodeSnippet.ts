@@ -13,6 +13,11 @@ import * as accuracy from '../lib/accuracy'
 import * as utils from '../lib/utils'
 import { type ChallengeKey } from 'models/challenge'
 
+// Helper to validate file names (no path traversal)
+function isSafeFileName (name: string): boolean {
+  return /^[a-zA-Z0-9_.-]+$/.test(name)
+}
+
 interface SnippetRequestBody {
   challenge: string
 }
@@ -69,6 +74,10 @@ export const getVerdict = (vulnLines: number[], neutralLines: number[], selected
 
 export const checkVulnLines = () => async (req: Request<Record<string, unknown>, Record<string, unknown>, VerdictRequestBody>, res: Response, next: NextFunction) => {
   const key = req.body.key
+  // Only allow safe keys (no path traversal)
+  if (!isSafeFileName(key)) {
+    return res.status(400).json({ status: 'error', error: 'Invalid key.' })
+  }
   let snippetData
   try {
     snippetData = await retrieveCodeSnippet(key)

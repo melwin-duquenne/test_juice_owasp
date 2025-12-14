@@ -35,7 +35,11 @@ describe('LoginGuard', () => {
   }))
 
   it('returns payload from decoding a valid JWT', inject([LoginGuard], (guard: LoginGuard) => {
-    localStorage.setItem('token', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c')
+    // Le JWT est désormais lu depuis la variable d’environnement TEST_JWT
+    const jwt = (typeof process !== 'undefined' && process.env && process.env.TEST_JWT)
+      ? process.env.TEST_JWT
+      : ''
+    localStorage.setItem('token', jwt)
     expect(guard.tokenDecode()).toEqual({
       sub: '1234567890',
       name: 'John Doe',
