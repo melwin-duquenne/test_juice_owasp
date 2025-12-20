@@ -4,7 +4,6 @@
  */
 
 import { type Request, type Response, type NextFunction } from 'express'
-import fs from 'node:fs/promises'
 import config from 'config'
 import pug from 'pug'
 
@@ -22,10 +21,18 @@ export function errorHandler () {
       return
     }
 
-    const template = await fs.readFile('views/errorPage.pug', { encoding: 'utf-8' })
     const title = `${config.get<string>('application.name')} (Express ${utils.version('express')})`
-    // Compile le template Pug en mode strict pour éviter l'exécution de code non prévu
-    const fn = pug.compile(template, { filename: 'views/errorPage.pug', compileDebug: false, inlineRuntimeFunctions: false })
+    // Template Pug statique sécurisé, compilé à l'avance
+    const pugTemplate = `
+doctype html
+html
+  head
+    title= title
+  body
+    h1= title
+    p.error-message= error
+`
+    const fn = pug.compile(pugTemplate, { compileDebug: false, inlineRuntimeFunctions: false })
     // Sanitize l'objet error pour éviter toute injection de contenu dangereux dans le template
     const safeError = typeof error === 'string' ? error.replace(/</g, '&lt;').replace(/>/g, '&gt;') : JSON.stringify(error, (k, v) => typeof v === 'string' ? v.replace(/</g, '&lt;').replace(/>/g, '&gt;') : v)
     res.status(500).send(fn({ title, error: safeError }))

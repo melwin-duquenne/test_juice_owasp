@@ -152,31 +152,43 @@ export function placeOrder () {
           }
 
           // Validation et conversion explicite de chaque champ avant insertion
-          const safeOrder = {
-            promotionalAmount: typeof discountAmount === 'string' ? discountAmount : String(discountAmount),
-            paymentId: req.body.orderDetails && typeof req.body.orderDetails.paymentId === 'string' ? req.body.orderDetails.paymentId : null,
-            addressId: req.body.orderDetails && typeof req.body.orderDetails.addressId === 'string' ? req.body.orderDetails.addressId : null,
-            orderId: typeof orderId === 'string' ? orderId : String(orderId),
-            delivered: false,
-            email: (email ? email.replace(/[aeiou]/gi, '*') : undefined),
-            totalPrice: typeof totalPrice === 'number' ? totalPrice : Number(totalPrice),
-            products: Array.isArray(basketProducts)
-              ? basketProducts.map(p => ({
-                quantity: typeof p.quantity === 'number' ? p.quantity : Number(p.quantity),
-                id: typeof p.id === 'number' ? p.id : (p.id ? Number(p.id) : undefined),
-                name: typeof p.name === 'string' ? p.name.replace(/["'\\<>]/g, '') : '',
-                price: typeof p.price === 'number' ? p.price : Number(p.price),
-                total: typeof p.total === 'number' ? p.total : Number(p.total),
-                bonus: typeof p.bonus === 'number' ? p.bonus : Number(p.bonus)
+          // Construction stricte et whitelistée de l'objet safeOrder
+          const safeOrder = {} as any;
+          // promotionalAmount : string numérique positive
+          safeOrder.promotionalAmount = /^[0-9]+(\.[0-9]{1,2})?$/.test(String(discountAmount)) ? String(discountAmount) : '0';
+          // paymentId : string alphanumérique ou null
+          safeOrder.paymentId = req.body.orderDetails && typeof req.body.orderDetails.paymentId === 'string' && /^[a-zA-Z0-9_-]{1,32}$/.test(req.body.orderDetails.paymentId);
+          // addressId : string alphanumérique ou null
+          safeOrder.addressId = req.body.orderDetails && typeof req.body.orderDetails.addressId === 'string' && /^[a-zA-Z0-9_-]{1,32}$/.test(req.body.orderDetails.addressId);
+          // orderId : string formaté
+          safeOrder.orderId = typeof orderId === 'string' && /^[a-f0-9]{4}-[a-f0-9]{16}$/.test(orderId) ? orderId : utils.randomHexString(4) + '-' + utils.randomHexString(16);
+          // delivered : booléen
+          safeOrder.delivered = false;
+          // email : string masqué
+          safeOrder.email = (typeof email === 'string' && /^[^@]{1,64}@[^@]{1,255}$/.test(email)) ? email.replace(/[aeiou]/gi, '*') : undefined;
+          // totalPrice : nombre positif
+          safeOrder.totalPrice = typeof totalPrice === 'number' && isFinite(totalPrice) && totalPrice >= 0 ? totalPrice : 0;
+          // products : tableau whitelisté
+          safeOrder.products = Array.isArray(basketProducts)
+            ? basketProducts.map(p => ({
+                quantity: typeof p.quantity === 'number' && Number.isInteger(p.quantity) && p.quantity > 0 ? p.quantity : 1,
+                id: typeof p.id === 'number' && Number.isInteger(p.id) && p.id > 0 ? p.id : undefined,
+                name: typeof p.name === 'string' ? p.name.replace(/[^\w\s\-]/g, '') : '',
+                price: typeof p.price === 'number' && isFinite(p.price) && p.price >= 0 ? p.price : 0,
+                total: typeof p.total === 'number' && isFinite(p.total) && p.total >= 0 ? p.total : 0,
+                bonus: typeof p.bonus === 'number' && isFinite(p.bonus) && p.bonus >= 0 ? p.bonus : 0
               }))
-              : [],
-            bonus: typeof totalPoints === 'number' ? totalPoints : Number(totalPoints),
-            deliveryPrice: typeof deliveryAmount === 'number' ? deliveryAmount : Number(deliveryAmount),
-            eta: typeof deliveryMethod.eta === 'number' ? deliveryMethod.eta.toString() : String(deliveryMethod.eta)
-          }
+            : [];
+          // bonus : nombre positif
+          safeOrder.bonus = typeof totalPoints === 'number' && isFinite(totalPoints) && totalPoints >= 0 ? totalPoints : 0;
+          // deliveryPrice : nombre positif
+          safeOrder.deliveryPrice = typeof deliveryAmount === 'number' && isFinite(deliveryAmount) && deliveryAmount >= 0 ? deliveryAmount : 0;
+          // eta : nombre entier positif (en string)
+          safeOrder.eta = typeof deliveryMethod.eta === 'number' && Number.isInteger(deliveryMethod.eta) && deliveryMethod.eta > 0 ? String(deliveryMethod.eta) : '5';
+
           db.ordersCollection.insert(safeOrder).then(() => {
-            doc.end()
-          })
+            doc.end();
+          });
         } else {
           next(new Error(`Basket with id=${id} does not exist.`))
         }
