@@ -20,7 +20,7 @@ import * as utils from './utils'
 import * as z85 from 'z85'
 
 export const publicKey = fs ? fs.readFileSync('encryptionkeys/jwt.pub', 'utf8') : 'placeholder-public-key'
-const privateKey = process.env.PRIVATE_KEY || ''
+const privateKey = process.env.PRIVATE_KEY
 
 interface ResponseWithUser {
   status?: string

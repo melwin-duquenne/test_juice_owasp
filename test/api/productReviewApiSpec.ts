@@ -15,7 +15,9 @@ const Joi = frisby.Joi
 const REST_URL = 'http://localhost:3000/rest'
 
 const jsonHeader = { 'content-type': 'application/json' }
-const authHeader = { Authorization: `Bearer ${security.authorize()}`, 'content-type': 'application/json' }
+const tokenRaw = security.authorize()
+const token = typeof tokenRaw === 'string' ? tokenRaw : ''
+const authHeader = { Authorization: `Bearer ${token}`, 'content-type': 'application/json' }
 
 describe('/rest/products/:id/reviews', () => {
   const reviewResponseSchema = {

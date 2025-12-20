@@ -18,7 +18,7 @@ export function profileImageUrlUpload () {
     if (req.body.imageUrl !== undefined) {
       const url = req.body.imageUrl
       // Validate URL: must be http(s) and not contain path traversal
-      if (typeof url !== 'string' || !/^https?:\/\//i.test(url) || /\.\./.test(url)) {
+      if (typeof url !== 'string' || !/^https?:\/\//i.test(url) || url.includes('..')) {
         return res.status(400).json({ error: 'URL d\'image non valide.' })
       }
       if (url.match(/(.)*solve\/challenges\/server-side(.)*/) !== null) req.app.locals.abused_ssrf_bug = true
@@ -45,7 +45,7 @@ export function profileImageUrlUpload () {
           try {
             const user = await UserModel.findByPk(loggedInUser.data.id)
             // Only allow http(s) URLs for direct link as well
-            if (typeof url === 'string' && /^https?:\/\//i.test(url) && !/\.\./.test(url)) {
+            if (typeof url === 'string' && /^https?:\/\//i.test(url) && !url.includes('..')) {
               await user?.update({ profileImage: url })
               logger.warn(`Error retrieving user profile image: ${utils.getErrorMessage(error)}; using image link directly`)
             } else {

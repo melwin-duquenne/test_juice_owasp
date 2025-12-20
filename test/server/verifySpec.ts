@@ -280,7 +280,8 @@ describe('verify', () => {
     })
 
     it('"jwtUnsignedChallenge" is not solved via regularly signed token even with email jwtn3d@juice-sh.op in the payload', () => {
-      const token = security.authorize({ data: { email: 'jwtn3d@juice-sh.op' } })
+      const tokenRaw = security.authorize({ data: { email: 'jwtn3d@juice-sh.op' } })
+      const token = typeof tokenRaw === 'string' ? tokenRaw : ''
       req.headers = { authorization: `Bearer ${token}` }
 
       verify.jwtChallenges()(req, res, next)
@@ -314,7 +315,8 @@ describe('verify', () => {
       })
 
       it('"jwtForgedChallenge" is not solved when token regularly signed with private RSA-key has email rsa_lord@juice-sh.op in the payload', () => {
-        const token = security.authorize({ data: { email: 'rsa_lord@juice-sh.op' } })
+        const tokenRaw = security.authorize({ data: { email: 'rsa_lord@juice-sh.op' } })
+        const token = typeof tokenRaw === 'string' ? tokenRaw : ''
         req.headers = { authorization: `Bearer ${token}` }
 
         verify.jwtChallenges()(req, res, next)

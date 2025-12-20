@@ -9,7 +9,9 @@ const Joi = frisby.Joi
 
 const API_URL = 'http://localhost:3000/api'
 
-const authHeader = { Authorization: `Bearer ${security.authorize()}`, 'content-type': 'application/json' }
+const tokenRaw = security.authorize()
+const token = typeof tokenRaw === 'string' ? tokenRaw : ''
+const authHeader = { Authorization: `Bearer ${token}`, 'content-type': 'application/json' }
 
 describe('/api/SecurityAnswers', () => {
   it('GET all security answers is forbidden via public API even when authenticated', () => {

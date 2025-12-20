@@ -11,7 +11,9 @@ const Joi = frisby.Joi
 
 const API_URL = 'http://localhost:3000/b2b/v2/orders'
 
-const authHeader = { Authorization: 'Bearer ' + security.authorize(), 'content-type': 'application/json' }
+const tokenRaw = security.authorize()
+const token = typeof tokenRaw === 'string' ? tokenRaw : ''
+const authHeader = { Authorization: 'Bearer ' + token, 'content-type': 'application/json' }
 
 describe('/b2b/v2/orders', () => {
   if (utils.isChallengeEnabled(challenges.rceChallenge) || utils.isChallengeEnabled(challenges.rceOccupyChallenge)) {

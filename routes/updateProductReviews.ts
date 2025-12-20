@@ -24,7 +24,7 @@ export function updateProductReviews () {
 
     // Sanitize message: remove HTML tags and dangerous characters
     const sanitizedMessage = typeof message === 'string'
-      ? message.replace(/<[^>]*>/g, '').replace(/[\$\{\}\[\];]/g, '')
+      ? message.replace(/<[^>]*>/g, '').replace(/[${}[\];]/g, '')
       : ''
 
     db.reviewsCollection.update(

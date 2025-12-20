@@ -11,7 +11,9 @@ import config from 'config'
 const REST_URL = 'http://localhost:3000/rest'
 
 const jsonHeader = { ContentType: 'application/json' }
-const authHeader = { Authorization: `Bearer ${security.authorize({ data: { email: 'admin@juice-sh.op' } })}`, 'content-type': 'application/json' }
+const tokenRaw = security.authorize({ data: { email: 'admin@juice-sh.op' } })
+const token = typeof tokenRaw === 'string' ? tokenRaw : ''
+const authHeader = { Authorization: `Bearer ${token}`, 'content-type': 'application/json' }
 
 describe('/rest/user/authentication-details', () => {
   it('GET all users with password replaced by asterisks', () => {
