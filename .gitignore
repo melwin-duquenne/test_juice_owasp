@@ -1,3 +1,5 @@
+# 
+.env
 # App
 node_modules/
 juiceshop.sqlite
