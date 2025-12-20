@@ -8,6 +8,20 @@ import path from 'node:path'
 import config from 'config'
 import PDFDocument from 'pdfkit'
 import { type Request, type Response, type NextFunction } from 'express'
+import { z } from 'zod'
+// Sanitize MongoDB operators from any object
+function sanitizeMongo(obj: any) {
+  if (obj && typeof obj === 'object') {
+    for (const key in obj) {
+      if (key.startsWith('$') || key.includes('.')) {
+        delete obj[key]
+      } else {
+        sanitizeMongo(obj[key])
+      }
+    }
+  }
+  return obj
+}
 
 import { challenges, products } from '../data/datacache'
 import * as challengeUtils from '../lib/challengeUtils'
@@ -152,41 +166,59 @@ export function placeOrder () {
           }
 
           // Validation et conversion explicite de chaque champ avant insertion
-          // Construction stricte et whitelistée de l'objet safeOrder
-          const safeOrder = {} as any;
-          // promotionalAmount : string numérique positive
-          safeOrder.promotionalAmount = /^[0-9]+(\.[0-9]{1,2})?$/.test(String(discountAmount)) ? String(discountAmount) : '0';
-          // paymentId : string alphanumérique ou null
-          safeOrder.paymentId = req.body.orderDetails && typeof req.body.orderDetails.paymentId === 'string' && /^[a-zA-Z0-9_-]{1,32}$/.test(req.body.orderDetails.paymentId);
-          // addressId : string alphanumérique ou null
-          safeOrder.addressId = req.body.orderDetails && typeof req.body.orderDetails.addressId === 'string' && /^[a-zA-Z0-9_-]{1,32}$/.test(req.body.orderDetails.addressId);
-          // orderId : string formaté
+          // Construction stricte de l'objet safeOrder
+          const safeOrder: any = {};
+          if (typeof discountAmount === 'string' && /^[0-9]+(\.[0-9]{1,2})?$/.test(discountAmount)) safeOrder.promotionalAmount = discountAmount;
+          if (req.body.orderDetails && typeof req.body.orderDetails.paymentId === 'string' && /^[a-zA-Z0-9_-]{1,32}$/.test(req.body.orderDetails.paymentId)) safeOrder.paymentId = req.body.orderDetails.paymentId;
+          if (req.body.orderDetails && typeof req.body.orderDetails.addressId === 'string' && /^[a-zA-Z0-9_-]{1,32}$/.test(req.body.orderDetails.addressId)) safeOrder.addressId = req.body.orderDetails.addressId;
           safeOrder.orderId = typeof orderId === 'string' && /^[a-f0-9]{4}-[a-f0-9]{16}$/.test(orderId) ? orderId : utils.randomHexString(4) + '-' + utils.randomHexString(16);
-          // delivered : booléen
           safeOrder.delivered = false;
-          // email : string masqué
-          safeOrder.email = (typeof email === 'string' && /^[^@]{1,64}@[^@]{1,255}$/.test(email)) ? email.replace(/[aeiou]/gi, '*') : undefined;
-          // totalPrice : nombre positif
-          safeOrder.totalPrice = typeof totalPrice === 'number' && isFinite(totalPrice) && totalPrice >= 0 ? totalPrice : 0;
-          // products : tableau whitelisté
+          if (typeof email === 'string' && /^[^@]{1,64}@[^@]{1,255}$/.test(email)) safeOrder.email = email.replace(/[aeiou]/gi, '*');
+          safeOrder.totalPrice = Number(totalPrice);
+          if (!Number.isFinite(safeOrder.totalPrice) || safeOrder.totalPrice < 0) throw new Error('Invalid totalPrice');
           safeOrder.products = Array.isArray(basketProducts)
             ? basketProducts.map(p => ({
-                quantity: typeof p.quantity === 'number' && Number.isInteger(p.quantity) && p.quantity > 0 ? p.quantity : 1,
+                quantity: Number(p.quantity),
                 id: typeof p.id === 'number' && Number.isInteger(p.id) && p.id > 0 ? p.id : undefined,
-                name: typeof p.name === 'string' ? p.name.replace(/[^\w\s\-]/g, '') : '',
-                price: typeof p.price === 'number' && isFinite(p.price) && p.price >= 0 ? p.price : 0,
-                total: typeof p.total === 'number' && isFinite(p.total) && p.total >= 0 ? p.total : 0,
-                bonus: typeof p.bonus === 'number' && isFinite(p.bonus) && p.bonus >= 0 ? p.bonus : 0
+                name: typeof p.name === 'string' ? p.name.replace(/[^\w\s\-]/g, '').slice(0,128) : '',
+                price: Number(p.price),
+                total: Number(p.total),
+                bonus: Number(p.bonus)
               }))
             : [];
-          // bonus : nombre positif
-          safeOrder.bonus = typeof totalPoints === 'number' && isFinite(totalPoints) && totalPoints >= 0 ? totalPoints : 0;
-          // deliveryPrice : nombre positif
-          safeOrder.deliveryPrice = typeof deliveryAmount === 'number' && isFinite(deliveryAmount) && deliveryAmount >= 0 ? deliveryAmount : 0;
-          // eta : nombre entier positif (en string)
+          safeOrder.bonus = Number(totalPoints);
+          if (!Number.isFinite(safeOrder.bonus) || safeOrder.bonus < 0) throw new Error('Invalid bonus');
+          safeOrder.deliveryPrice = Number(deliveryAmount);
+          if (!Number.isFinite(safeOrder.deliveryPrice) || safeOrder.deliveryPrice < 0) throw new Error('Invalid deliveryPrice');
           safeOrder.eta = typeof deliveryMethod.eta === 'number' && Number.isInteger(deliveryMethod.eta) && deliveryMethod.eta > 0 ? String(deliveryMethod.eta) : '5';
 
-          db.ordersCollection.insert(safeOrder).then(() => {
+          // Schéma Zod strict
+          const OrderSchema = z.object({
+            orderId: z.string().regex(/^[a-f0-9]{4}-[a-f0-9]{16}$/),
+            email: z.string().max(255).optional(),
+            totalPrice: z.number().min(0),
+            deliveryPrice: z.number().min(0),
+            bonus: z.number().min(0),
+            delivered: z.boolean(),
+            eta: z.string().regex(/^\d+$/),
+            products: z.array(z.object({
+              id: z.number().int().positive().optional(),
+              name: z.string().max(128),
+              quantity: z.number().int().positive(),
+              price: z.number().min(0),
+              total: z.number().min(0),
+              bonus: z.number().min(0)
+            })),
+            promotionalAmount: z.string().regex(/^[0-9]+(\.[0-9]{1,2})?$/).optional(),
+            paymentId: z.string().max(32).optional(),
+            addressId: z.string().max(32).optional()
+          });
+
+          // Nettoyage anti-opérateurs MongoDB
+          const sanitizedOrder = sanitizeMongo(safeOrder);
+          // Validation stricte du schéma
+          const validatedOrder = OrderSchema.parse(sanitizedOrder);
+          db.ordersCollection.insertOne(validatedOrder).then(() => {
             doc.end();
           });
         } else {

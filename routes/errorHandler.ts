@@ -5,7 +5,6 @@
 
 import { type Request, type Response, type NextFunction } from 'express'
 import config from 'config'
-import pug from 'pug'
 
 import * as utils from '../lib/utils'
 
@@ -22,19 +21,18 @@ export function errorHandler () {
     }
 
     const title = `${config.get<string>('application.name')} (Express ${utils.version('express')})`
-    // Template Pug statique sécurisé, compilé à l'avance
-    const pugTemplate = `
-doctype html
-html
-  head
-    title= title
-  body
-    h1= title
-    p.error-message= error
-`
-    const fn = pug.compile(pugTemplate, { compileDebug: false, inlineRuntimeFunctions: false })
-    // Sanitize l'objet error pour éviter toute injection de contenu dangereux dans le template
-    const safeError = typeof error === 'string' ? error.replace(/</g, '&lt;').replace(/>/g, '&gt;') : JSON.stringify(error, (k, v) => typeof v === 'string' ? v.replace(/</g, '&lt;').replace(/>/g, '&gt;') : v)
-    res.status(500).send(fn({ title, error: safeError }))
+    // Échappement strict pour HTML
+    function escapeHtml(str: string) {
+      return str.replace(/[&<>"']/g, function (c) {
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c] || c
+      })
+    }
+    const safeError = typeof error === 'string'
+      ? escapeHtml(error)
+      : escapeHtml(JSON.stringify(error, (k, v) => typeof v === 'string' ? escapeHtml(v) : v))
+    const safeTitle = escapeHtml(title)
+    const html = `<!DOCTYPE html>
+<html><head><title>${safeTitle}</title></head><body><h1>${safeTitle}</h1><p class="error-message">${safeError}</p></body></html>`
+    res.status(500).send(html)
   }
 }

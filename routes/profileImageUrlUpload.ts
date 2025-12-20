@@ -4,7 +4,6 @@
  */
 
 import fs from 'node:fs'
-import { Readable } from 'node:stream'
 import { finished } from 'node:stream/promises'
 import { URL } from 'node:url'
 import axios from 'axios'
