@@ -7,6 +7,8 @@ import { type Request, type Response, type NextFunction } from 'express'
 
 import * as utils from '../lib/utils'
 import * as models from '../models/index'
+import { ProductModel } from '../models/product'
+import { Op } from 'sequelize'
 import { UserModel } from '../models/user'
 import { challenges } from '../data/datacache'
 import * as challengeUtils from '../lib/challengeUtils'
@@ -23,10 +25,21 @@ export function searchProducts () {
     if (typeof criteria !== 'string') criteria = ''
     criteria = criteria.replace(/['";\\]/g, '').trim()
     criteria = (criteria.length <= 200) ? criteria : criteria.substring(0, 200)
-    models.sequelize.query(
-      `SELECT * FROM Products WHERE ((name LIKE '%${criteria}%' OR description LIKE '%${criteria}%') AND deletedAt IS NULL) ORDER BY name`
-    )
-      .then(([products]: any) => {
+    ProductModel.findAll({
+      where: {
+        [Op.and]: [
+          {
+            [Op.or]: [
+              { name: { [Op.like]: `%${criteria}%` } },
+              { description: { [Op.like]: `%${criteria}%` } }
+            ]
+          },
+          { deletedAt: null }
+        ]
+      },
+      order: [['name', 'ASC']]
+    })
+      .then((products: any) => {
         const dataString = JSON.stringify(products)
         if (challengeUtils.notSolved(challenges.unionSqlInjectionChallenge)) {
           let solved = true

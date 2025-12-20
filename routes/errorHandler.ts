@@ -24,7 +24,10 @@ export function errorHandler () {
 
     const template = await fs.readFile('views/errorPage.pug', { encoding: 'utf-8' })
     const title = `${config.get<string>('application.name')} (Express ${utils.version('express')})`
-    const fn = pug.compile(template)
-    res.status(500).send(fn({ title, error }))
+    // Compile le template Pug en mode strict pour éviter l'exécution de code non prévu
+    const fn = pug.compile(template, { filename: 'views/errorPage.pug', compileDebug: false, inlineRuntimeFunctions: false })
+    // Sanitize l'objet error pour éviter toute injection de contenu dangereux dans le template
+    const safeError = typeof error === 'string' ? error.replace(/</g, '&lt;').replace(/>/g, '&gt;') : JSON.stringify(error, (k, v) => typeof v === 'string' ? v.replace(/</g, '&lt;').replace(/>/g, '&gt;') : v)
+    res.status(500).send(fn({ title, error: safeError }))
   }
 }

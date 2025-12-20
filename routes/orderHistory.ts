@@ -1,3 +1,4 @@
+import { ObjectId } from 'mongodb'
 /*
  * Copyright (c) 2014-2026 Bjoern Kimminich & the OWASP Juice Shop contributors.
  * SPDX-License-Identifier: MIT
@@ -39,7 +40,14 @@ export function toggleDeliveryStatus () {
   return async (req: Request, res: Response, next: NextFunction) => {
     const deliveryStatus = !req.body.deliveryStatus
     const eta = deliveryStatus ? '0' : '1'
-    await ordersCollection.update({ _id: req.params.id }, { $set: { delivered: deliveryStatus, eta } })
+    let objectId: ObjectId | null = null
+    if (typeof req.params.id === 'string' && ObjectId.isValid(req.params.id)) {
+      objectId = new ObjectId(req.params.id)
+    }
+    if (!objectId) {
+      return res.status(400).json({ error: 'Invalid order id' })
+    }
+    await ordersCollection.update({ _id: objectId }, { $set: { delivered: deliveryStatus, eta } })
     res.status(200).json({ status: 'success' })
   }
 }

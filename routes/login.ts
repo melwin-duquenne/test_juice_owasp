@@ -10,7 +10,6 @@ import { challenges, users } from '../data/datacache'
 import { BasketModel } from '../models/basket'
 import * as security from '../lib/insecurity'
 import { UserModel } from '../models/user'
-import * as models from '../models/index'
 import { type User } from '../data/types'
 import * as utils from '../lib/utils'
 
@@ -38,10 +37,13 @@ export function login () {
     if (!email || !password) {
       return res.status(400).send(res.__('Invalid email or password.'))
     }
-    models.sequelize.query(
-      `SELECT * FROM Users WHERE email = '${email}' AND password = '${security.hash(password)}' AND deletedAt IS NULL`,
-      { model: UserModel, plain: true }
-    )
+    UserModel.findOne({
+      where: {
+        email,
+        password: security.hash(password),
+        deletedAt: null
+      }
+    })
       .then((authenticatedUser) => {
         const user = utils.queryResultToJson(authenticatedUser)
         if (user.data?.id && user.data.totpSecret !== '') {

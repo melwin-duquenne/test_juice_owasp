@@ -68,6 +68,66 @@ Description : Requêtes SQL construites directement à partir de données utilis
 
 ---
 
+### 6. Seed phrase exposée en clair
+
+**Fichier concerné :**
+
+- routes/checkKeys.ts (ligne contenant la seed phrase)
+
+Description : Seed phrase (phrase de récupération) codée en dur dans le code source.
+
+---
+
+### 7. Clé HMAC exposée en clair
+
+**Fichier concerné :**
+
+- lib/insecurity.ts (ligne contenant la clé HMAC)
+
+Description : Clé HMAC codée en dur dans le code source.
+
+---
+
+### 8. Construction de requêtes MongoDB à partir de données utilisateur non validées
+
+**Fichier concerné :**
+
+- routes/createProductReviews.ts (insertion du champ product à partir de req.params.id)
+
+Description : L’id produit était inséré en base sans validation, ce qui permettait une potentielle injection ou un comportement inattendu.
+
+---
+
+### 9. Injection de données utilisateur dans res.render (dataErasureResult)
+
+**Fichier concerné :**
+
+- routes/dataErasure.ts (passage de ...req.body à res.render)
+
+Description : Les données utilisateur étaient passées telles quelles à res.render, ce qui pouvait permettre une injection de variables ou un comportement inattendu dans le template.
+
+---
+
+### 10. Compilation dynamique de template Pug sans restriction
+
+**Fichier concerné :**
+
+- routes/errorHandler.ts (utilisation de pug.compile sur un template dynamique)
+
+Description : La compilation dynamique de template Pug sans option de sécurité pouvait permettre l’exécution de code non prévu si le template était modifié ou corrompu.
+
+---
+
+### 11. Injection de contenu dangereux dans le template d’erreur Pug
+
+**Fichier concerné :**
+
+- routes/errorHandler.ts (passage de error directement au template)
+
+Description : L’objet error était passé tel quel au template Pug, ce qui pouvait permettre l’injection de contenu HTML ou scripté dans la page d’erreur.
+
+---
+
 ## Correction des erreurs Analyser par SonarQube
 
 ### Correction : Exécution dynamique de code influencé par l’utilisateur dans routes/trackOrder.ts
@@ -120,7 +180,7 @@ La clé utilisée pour accéder aux fichiers est désormais validée pour n’ac
 
 ### Correction : Construction de requêtes SQL à partir de données utilisateur dans routes/login.ts
 
-Les champs email et password sont désormais validés et nettoyés avant d’être utilisés dans la requête SQL. Cela empêche toute tentative d’injection SQL via ces champs.
+La requête SQL brute a été supprimée et remplacée par l’utilisation de UserModel.findOne avec des conditions (ORM Sequelize). Les champs email et password sont toujours validés et nettoyés, puis passés comme paramètres à la méthode findOne, ce qui élimine totalement le risque d’injection SQL. Plus aucune chaîne SQL n’est construite à partir de données utilisateur.
 
 ### Correction : Construction de requêtes SQL à partir de données utilisateur dans routes/search.ts
 
@@ -138,3 +198,26 @@ Le JWT utilisé dans le test unitaire (ligne 61) est désormais lu depuis la var
 
 Le JWT utilisé dans le test unitaire (ligne 38) est désormais lu depuis la variable d’environnement TEST_JWT, définie dans un fichier .env ou dans l’environnement d’exécution. Cela évite d’exposer un jeton en clair dans le code source.
 
+### Correction : Seed phrase exposée en clair dans routes/checkKeys.ts
+
+La seed phrase utilisée dans le code (anciennement codée en dur dans la fonction checkKeys) est désormais lue depuis la variable d’environnement MNEMONIC_SEED, définie dans un fichier .env ou dans l’environnement d’exécution. Cela évite d’exposer une phrase de récupération sensible en clair dans le code source.
+
+### Correction : Clé HMAC exposée en clair dans lib/insecurity.ts
+
+La clé HMAC utilisée dans le code (anciennement codée en dur dans la fonction hmac) est désormais lue depuis la variable d’environnement HMAC_SECRET, définie dans un fichier .env ou dans l’environnement d’exécution. Cela évite d’exposer une clé sensible en clair dans le code source.
+
+### Correction : Validation de l’id produit dans routes/createProductReviews.ts
+
+L’id produit (req.params.id) est désormais validé comme un ObjectId MongoDB valide (24 caractères hexadécimaux) avant d’être inséré en base. Cela empêche toute tentative d’injection ou d’abus via ce champ.
+
+### Correction : Passage de données filtrées à res.render dans routes/dataErasure.ts
+
+Seuls les champs explicitement attendus (email, securityAnswer) sont désormais transmis à res.render, empêchant toute injection ou abus via d’autres champs du body.
+
+### Correction : Compilation stricte du template Pug dans routes/errorHandler.ts
+
+Le template Pug est désormais compilé avec des options restrictives (compileDebug: false, inlineRuntimeFunctions: false, filename renseigné) pour limiter les risques d’exécution de code non prévu lors de la gestion des erreurs.
+
+### Correction : Sanitation de l’objet error dans routes/errorHandler.ts
+
+L’objet error est désormais nettoyé (remplacement des chevrons < et >) avant d’être passé au template Pug, empêchant toute injection de contenu HTML ou scripté dans la page d’erreur.

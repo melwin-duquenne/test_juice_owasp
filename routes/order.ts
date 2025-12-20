@@ -151,19 +151,30 @@ export function placeOrder () {
             })
           }
 
-          db.ordersCollection.insert({
-            promotionalAmount: discountAmount,
-            paymentId: req.body.orderDetails ? req.body.orderDetails.paymentId : null,
-            addressId: req.body.orderDetails ? req.body.orderDetails.addressId : null,
-            orderId,
+          // Validation et conversion explicite de chaque champ avant insertion
+          const safeOrder = {
+            promotionalAmount: typeof discountAmount === 'string' ? discountAmount : String(discountAmount),
+            paymentId: req.body.orderDetails && typeof req.body.orderDetails.paymentId === 'string' ? req.body.orderDetails.paymentId : null,
+            addressId: req.body.orderDetails && typeof req.body.orderDetails.addressId === 'string' ? req.body.orderDetails.addressId : null,
+            orderId: typeof orderId === 'string' ? orderId : String(orderId),
             delivered: false,
             email: (email ? email.replace(/[aeiou]/gi, '*') : undefined),
-            totalPrice,
-            products: basketProducts,
-            bonus: totalPoints,
-            deliveryPrice: deliveryAmount,
-            eta: deliveryMethod.eta.toString()
-          }).then(() => {
+            totalPrice: typeof totalPrice === 'number' ? totalPrice : Number(totalPrice),
+            products: Array.isArray(basketProducts)
+              ? basketProducts.map(p => ({
+                quantity: typeof p.quantity === 'number' ? p.quantity : Number(p.quantity),
+                id: typeof p.id === 'number' ? p.id : (p.id ? Number(p.id) : undefined),
+                name: typeof p.name === 'string' ? p.name.replace(/["'\\<>]/g, '') : '',
+                price: typeof p.price === 'number' ? p.price : Number(p.price),
+                total: typeof p.total === 'number' ? p.total : Number(p.total),
+                bonus: typeof p.bonus === 'number' ? p.bonus : Number(p.bonus)
+              }))
+              : [],
+            bonus: typeof totalPoints === 'number' ? totalPoints : Number(totalPoints),
+            deliveryPrice: typeof deliveryAmount === 'number' ? deliveryAmount : Number(deliveryAmount),
+            eta: typeof deliveryMethod.eta === 'number' ? deliveryMethod.eta.toString() : String(deliveryMethod.eta)
+          }
+          db.ordersCollection.insert(safeOrder).then(() => {
             doc.end()
           })
         } else {

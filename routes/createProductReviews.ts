@@ -23,12 +23,18 @@ export function createProductReviews () {
     const sanitize = (str: string) =>
       typeof str === 'string' ? str.replace(/<[^>]*>?/gm, '').replace(/["'\\]/g, '') : ''
 
+    // Validation et sanitation de l'id produit
+    const isValidProductId = typeof req.params.id === 'string' && /^[a-fA-F0-9]{24}$/.test(req.params.id)
+    const safeProductId = isValidProductId ? req.params.id : ''
     const safeMessage = sanitize(req.body.message)
     const safeAuthor = sanitize(req.body.author)
 
     try {
+      if (!isValidProductId) {
+        return res.status(400).json({ error: 'Invalid product id.' })
+      }
       await reviewsCollection.insert({
-        product: req.params.id,
+        product: safeProductId,
         message: safeMessage,
         author: safeAuthor,
         likesCount: 0,

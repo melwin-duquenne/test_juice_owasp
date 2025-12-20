@@ -11,16 +11,22 @@ import { challenges } from '../data/datacache'
 
 export function trackOrder () {
   return (req: Request, res: Response) => {
-    // Validation stricte de l’id de commande : alphanumérique et tiret uniquement
-    const idRaw = req.params.id
-    const id = /^[\w-]+$/.test(idRaw) ? idRaw : null
+    // Validation stricte de l’id de commande : alphanumérique et tiret uniquement, conversion explicite et safe
+    let id: string | null = null
+    if (typeof req.params.id === 'string' && /^[\w-]+$/.test(req.params.id)) {
+      // Conversion explicite, sans prototype ni propriétés cachées
+      id = String(req.params.id)
+    }
     if (!id) {
       res.status(400).json({ error: 'Invalid order id' })
       return
     }
 
     challengeUtils.solveIf(challenges.reflectedXssChallenge, () => { return utils.contains(id, '<iframe src="javascript:alert(`xss`)">') })
-    db.ordersCollection.find({ orderId: id }).then((order: any) => {
+    // Utilisation d'un objet simple, sans héritage ni prototype
+    const safeQuery = Object.create(null)
+    safeQuery.orderId = id
+    db.ordersCollection.find(safeQuery).then((order: any) => {
       const result = utils.queryResultToJson(order)
       challengeUtils.solveIf(challenges.noSqlOrdersChallenge, () => { return result.data.length > 1 })
       if (result.data[0] === undefined) {

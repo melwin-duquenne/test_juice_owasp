@@ -6,6 +6,7 @@
 import fs from 'node:fs'
 import { Readable } from 'node:stream'
 import { finished } from 'node:stream/promises'
+import { URL } from 'node:url'
 import { type Request, type Response, type NextFunction } from 'express'
 
 import * as security from '../lib/insecurity'
@@ -17,8 +18,20 @@ export function profileImageUrlUpload () {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (req.body.imageUrl !== undefined) {
       const url = req.body.imageUrl
-      // Validate URL: must be http(s) and not contain path traversal
-      if (typeof url !== 'string' || !/^https?:\/\//i.test(url) || url.includes('..')) {
+      // Validation stricte du schéma et du domaine
+      const allowedSchemes = ['http:', 'https:']
+      const allowedDomains = [
+        'trusted1.example.com',
+        'trusted2.example.com'
+        // Ajouter ici les domaines autorisés
+      ]
+      let parsedUrl: URL
+      try {
+        parsedUrl = new URL(url)
+      } catch {
+        return res.status(400).json({ error: 'URL d\'image non valide.' })
+      }
+      if (!allowedSchemes.includes(parsedUrl.protocol) || !allowedDomains.includes(parsedUrl.hostname) || url.includes('..')) {
         return res.status(400).json({ error: 'URL d\'image non valide.' })
       }
       if (url.match(/(.)*solve\/challenges\/server-side(.)*/) !== null) req.app.locals.abused_ssrf_bug = true
@@ -44,10 +57,14 @@ export function profileImageUrlUpload () {
         } catch (error) {
           try {
             const user = await UserModel.findByPk(loggedInUser.data.id)
-            // Only allow http(s) URLs for direct link as well
+            // Only allow http(s) URLs for direct link as well, et domaine autorisé
             if (typeof url === 'string' && /^https?:\/\//i.test(url) && !url.includes('..')) {
-              await user?.update({ profileImage: url })
-              logger.warn(`Error retrieving user profile image: ${utils.getErrorMessage(error)}; using image link directly`)
+              if (allowedSchemes.includes(parsedUrl.protocol) && allowedDomains.includes(parsedUrl.hostname)) {
+                await user?.update({ profileImage: url })
+                logger.warn(`Error retrieving user profile image: ${utils.getErrorMessage(error)}; using image link directly`)
+              } else {
+                logger.warn('Tentative d\'utilisation d\'une URL d\'image non valide.')
+              }
             } else {
               logger.warn('Tentative d\'utilisation d\'une URL d\'image non valide.')
             }

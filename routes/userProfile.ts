@@ -7,7 +7,6 @@ import { type Request, type Response, type NextFunction } from 'express'
 import { AllHtmlEntities as Entities } from 'html-entities'
 import config from 'config'
 import pug from 'pug'
-import fs from 'node:fs/promises'
 
 import * as challengeUtils from '../lib/challengeUtils'
 import { themes } from '../views/themes/themes'
@@ -24,9 +23,10 @@ function favicon () {
 
 export function getUserProfile () {
   return async (req: Request, res: Response, next: NextFunction) => {
-    let template: string
+    // Utilisation d'un template statique compilé par pug.compileFile
+    let fn: pug.compileTemplate | null = null
     try {
-      template = await fs.readFile('views/userProfile.pug', { encoding: 'utf-8' })
+      fn = pug.compileFile('views/userProfile.pug')
     } catch (err) {
       next(err)
       return
@@ -51,7 +51,6 @@ export function getUserProfile () {
     }
 
     let username = user.username
-
     if (username?.match(/#{(.*)}/) !== null && utils.isChallengeEnabled(challenges.usernameXssChallenge)) {
       req.app.locals.abused_ssti_bug = true
       const code = username?.substring(2, username.length - 1)
@@ -70,21 +69,22 @@ export function getUserProfile () {
     const themeKey = config.get<string>('application.theme') as keyof typeof themes
     const theme = themes[themeKey] || themes['bluegrey-lightgreen']
 
-    if (username) {
-      template = template.replace(/_username_/g, username)
+    // Prépare les données à passer au template
+    const templateData = {
+      username,
+      emailHash: security.hash(user?.email),
+      title: entities.encode(config.get<string>('application.name')),
+      favicon: favicon(),
+      bgColor: theme.bgColor,
+      textColor: theme.textColor,
+      navColor: theme.navColor,
+      primLight: theme.primLight,
+      primDark: theme.primDark,
+      logo: utils.extractFilename(config.get('application.logo')),
+      user
     }
-    template = template.replace(/_emailHash_/g, security.hash(user?.email))
-    template = template.replace(/_title_/g, entities.encode(config.get<string>('application.name')))
-    template = template.replace(/_favicon_/g, favicon())
-    template = template.replace(/_bgColor_/g, theme.bgColor)
-    template = template.replace(/_textColor_/g, theme.textColor)
-    template = template.replace(/_navColor_/g, theme.navColor)
-    template = template.replace(/_primLight_/g, theme.primLight)
-    template = template.replace(/_primDark_/g, theme.primDark)
-    template = template.replace(/_logo_/g, utils.extractFilename(config.get('application.logo')))
 
     try {
-      const fn = pug.compile(template)
       const CSP = `img-src 'self' ${user?.profileImage}; script-src 'self' 'unsafe-eval' https://code.getmdl.io http://ajax.googleapis.com`
 
       challengeUtils.solveIf(challenges.usernameXssChallenge, () => {
@@ -95,7 +95,7 @@ export function getUserProfile () {
         'Content-Security-Policy': CSP
       })
 
-      res.send(fn(user))
+      res.send(fn(templateData))
     } catch (err) {
       next(new Error('Blocked illegal activity by ' + req.socket.remoteAddress))
     }

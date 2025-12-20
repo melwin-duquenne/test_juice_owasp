@@ -78,7 +78,8 @@ function handleXmlUpload ({ file }: Request, res: Response, next: NextFunction) 
       const data = file.buffer.toString()
       try {
         // Suppression de l’exécution dynamique : on parse directement le XML
-        const xmlDoc = libxml.parseXml(data, { noblanks: true, noent: true, nocdata: true })
+        // Désactive la résolution des entités externes (noent) pour éviter les attaques XXE
+        const xmlDoc = libxml.parseXml(data, { noblanks: true, nocdata: true })
         const xmlString = xmlDoc.toString(false)
         challengeUtils.solveIf(challenges.xxeFileDisclosureChallenge, () => { return (utils.matchesEtcPasswdFile(xmlString) || utils.matchesSystemIniFile(xmlString)) })
         res.status(410)

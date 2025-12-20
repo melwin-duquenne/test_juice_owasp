@@ -9,6 +9,7 @@ import * as challengeUtils from '../lib/challengeUtils'
 import { challenges } from '../data/datacache'
 import * as security from '../lib/insecurity'
 import * as db from '../data/mongodb'
+import { ObjectId } from 'mongodb'
 
 // vuln-code-snippet start noSqlReviewsChallenge forgedReviewChallenge
 export function updateProductReviews () {
@@ -27,8 +28,10 @@ export function updateProductReviews () {
       ? message.replace(/<[^>]*>/g, '').replace(/[${}[\];]/g, '')
       : ''
 
+    // Conversion explicite de l'id en ObjectId pour la requête
+    const objectId = new ObjectId(id)
     db.reviewsCollection.update(
-      { _id: id },
+      { _id: objectId },
       { $set: { message: sanitizedMessage } },
       { multi: true }
     ).then(
