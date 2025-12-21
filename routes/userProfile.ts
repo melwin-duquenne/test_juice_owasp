@@ -15,7 +15,6 @@ import * as security from '../lib/insecurity'
 import { UserModel } from '../models/user'
 import * as utils from '../lib/utils'
 
-
 function favicon () {
   return utils.extractFilename(config.get('application.favicon'))
 }

@@ -43,7 +43,7 @@ export function profileImageUrlUpload () {
       try {
         // Téléchargement sécurisé via axios uniquement si domaine autorisé
         const response = await axios.get(parsedUrl.toString(), { responseType: 'stream', timeout: 5000 })
-        if (!response || !response.data) {
+        if (!response?.data) {
           throw new Error('url returned a non-OK status code or an empty body')
         }
         // Only allow safe file extensions

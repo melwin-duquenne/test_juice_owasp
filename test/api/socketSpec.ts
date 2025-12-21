@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-import { io, Socket } from 'socket.io-client'
+import { io, type Socket } from 'socket.io-client'
 
 describe('WebSocket', () => {
   let socket: Socket

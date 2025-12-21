@@ -14,7 +14,6 @@ import { themes } from '../views/themes/themes'
 import { challenges } from '../data/datacache'
 import * as utils from '../lib/utils'
 
-
 export const getVideo = () => {
   return (req: Request, res: Response) => {
     const path = videoPath()

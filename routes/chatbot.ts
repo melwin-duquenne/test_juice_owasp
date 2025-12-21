@@ -42,7 +42,7 @@ export async function initializeChatbot () {
 
   testCommand = JSON.parse(trainingSet).data[0].utterances[0]
   bot = new SimpleChatBot(config.get('application.chatBot.name'), config.get('application.chatBot.greeting'), trainingSet, config.get('application.chatBot.defaultResponse'))
-  return bot.train()
+  await bot.train()
 }
 
 void initializeChatbot()

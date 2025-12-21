@@ -42,11 +42,11 @@ interface UserInfo {
  * Uses fuzzy string matching for intent detection
  */
 class SimpleChatBot {
-  private name: string
-  private greeting: string
-  private defaultResponse: string
-  private intents: TrainingIntent[] = []
-  private users: Map<string, UserInfo> = new Map()
+  private readonly name: string
+  private readonly greeting: string
+  private readonly defaultResponse: string
+  private readonly intents: TrainingIntent[] = []
+  private readonly users = new Map<string, UserInfo>()
 
   public training = {
     state: false
@@ -89,7 +89,7 @@ class SimpleChatBot {
       intent.utterances = intent.utterances.map(u => u.toLowerCase().trim())
     })
     this.training.state = true
-    return Promise.resolve()
+    await Promise.resolve()
   }
 
   /**

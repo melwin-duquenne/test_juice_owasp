@@ -9,19 +9,6 @@ import config from 'config'
 import PDFDocument from 'pdfkit'
 import { type Request, type Response, type NextFunction } from 'express'
 import { z } from 'zod'
-// Sanitize MongoDB operators from any object
-function sanitizeMongo(obj: any) {
-  if (obj && typeof obj === 'object') {
-    for (const key in obj) {
-      if (key.startsWith('$') || key.includes('.')) {
-        delete obj[key]
-      } else {
-        sanitizeMongo(obj[key])
-      }
-    }
-  }
-  return obj
-}
 
 import { challenges, products } from '../data/datacache'
 import * as challengeUtils from '../lib/challengeUtils'
@@ -34,6 +21,19 @@ import { WalletModel } from '../models/wallet'
 import * as security from '../lib/insecurity'
 import * as utils from '../lib/utils'
 import * as db from '../data/mongodb'
+// Sanitize MongoDB operators from any object
+function sanitizeMongo (obj: any) {
+  if (obj && typeof obj === 'object') {
+    for (const key in obj) {
+      if (key.startsWith('$') || key.includes('.')) {
+        delete obj[key]
+      } else {
+        sanitizeMongo(obj[key])
+      }
+    }
+  }
+  return obj
+}
 
 interface Product {
   quantity: number
@@ -167,30 +167,30 @@ export function placeOrder () {
 
           // Validation et conversion explicite de chaque champ avant insertion
           // Construction stricte de l'objet safeOrder
-          const safeOrder: any = {};
-          if (typeof discountAmount === 'string' && /^[0-9]+(\.[0-9]{1,2})?$/.test(discountAmount)) safeOrder.promotionalAmount = discountAmount;
-          if (req.body.orderDetails && typeof req.body.orderDetails.paymentId === 'string' && /^[a-zA-Z0-9_-]{1,32}$/.test(req.body.orderDetails.paymentId)) safeOrder.paymentId = req.body.orderDetails.paymentId;
-          if (req.body.orderDetails && typeof req.body.orderDetails.addressId === 'string' && /^[a-zA-Z0-9_-]{1,32}$/.test(req.body.orderDetails.addressId)) safeOrder.addressId = req.body.orderDetails.addressId;
-          safeOrder.orderId = typeof orderId === 'string' && /^[a-f0-9]{4}-[a-f0-9]{16}$/.test(orderId) ? orderId : utils.randomHexString(4) + '-' + utils.randomHexString(16);
-          safeOrder.delivered = false;
-          if (typeof email === 'string' && /^[^@]{1,64}@[^@]{1,255}$/.test(email)) safeOrder.email = email.replace(/[aeiou]/gi, '*');
-          safeOrder.totalPrice = Number(totalPrice);
-          if (!Number.isFinite(safeOrder.totalPrice) || safeOrder.totalPrice < 0) throw new Error('Invalid totalPrice');
+          const safeOrder: any = {}
+          if (typeof discountAmount === 'string' && /^[0-9]+(\.[0-9]{1,2})?$/.test(discountAmount)) safeOrder.promotionalAmount = discountAmount
+          if (req.body.orderDetails && typeof req.body.orderDetails.paymentId === 'string' && /^[a-zA-Z0-9_-]{1,32}$/.test(req.body.orderDetails.paymentId)) safeOrder.paymentId = req.body.orderDetails.paymentId
+          if (req.body.orderDetails && typeof req.body.orderDetails.addressId === 'string' && /^[a-zA-Z0-9_-]{1,32}$/.test(req.body.orderDetails.addressId)) safeOrder.addressId = req.body.orderDetails.addressId
+          safeOrder.orderId = typeof orderId === 'string' && /^[a-f0-9]{4}-[a-f0-9]{16}$/.test(orderId) ? orderId : utils.randomHexString(4) + '-' + utils.randomHexString(16)
+          safeOrder.delivered = false
+          if (typeof email === 'string' && /^[^@]{1,64}@[^@]{1,255}$/.test(email)) safeOrder.email = email.replace(/[aeiou]/gi, '*')
+          safeOrder.totalPrice = Number(totalPrice)
+          if (!Number.isFinite(safeOrder.totalPrice) || safeOrder.totalPrice < 0) throw new Error('Invalid totalPrice')
           safeOrder.products = Array.isArray(basketProducts)
             ? basketProducts.map(p => ({
-                quantity: Number(p.quantity),
-                id: typeof p.id === 'number' && Number.isInteger(p.id) && p.id > 0 ? p.id : undefined,
-                name: typeof p.name === 'string' ? p.name.replace(/[^\w\s\-]/g, '').slice(0,128) : '',
-                price: Number(p.price),
-                total: Number(p.total),
-                bonus: Number(p.bonus)
-              }))
-            : [];
-          safeOrder.bonus = Number(totalPoints);
-          if (!Number.isFinite(safeOrder.bonus) || safeOrder.bonus < 0) throw new Error('Invalid bonus');
-          safeOrder.deliveryPrice = Number(deliveryAmount);
-          if (!Number.isFinite(safeOrder.deliveryPrice) || safeOrder.deliveryPrice < 0) throw new Error('Invalid deliveryPrice');
-          safeOrder.eta = typeof deliveryMethod.eta === 'number' && Number.isInteger(deliveryMethod.eta) && deliveryMethod.eta > 0 ? String(deliveryMethod.eta) : '5';
+              quantity: Number(p.quantity),
+              id: typeof p.id === 'number' && Number.isInteger(p.id) && p.id > 0 ? p.id : undefined,
+              name: typeof p.name === 'string' ? p.name.replace(/[^\w\s\-]/g, '').slice(0, 128) : '',
+              price: Number(p.price),
+              total: Number(p.total),
+              bonus: Number(p.bonus)
+            }))
+            : []
+          safeOrder.bonus = Number(totalPoints)
+          if (!Number.isFinite(safeOrder.bonus) || safeOrder.bonus < 0) throw new Error('Invalid bonus')
+          safeOrder.deliveryPrice = Number(deliveryAmount)
+          if (!Number.isFinite(safeOrder.deliveryPrice) || safeOrder.deliveryPrice < 0) throw new Error('Invalid deliveryPrice')
+          safeOrder.eta = typeof deliveryMethod.eta === 'number' && Number.isInteger(deliveryMethod.eta) && deliveryMethod.eta > 0 ? String(deliveryMethod.eta) : '5'
 
           // Schéma Zod strict
           const OrderSchema = z.object({
@@ -212,15 +212,15 @@ export function placeOrder () {
             promotionalAmount: z.string().regex(/^[0-9]+(\.[0-9]{1,2})?$/).optional(),
             paymentId: z.string().max(32).optional(),
             addressId: z.string().max(32).optional()
-          });
+          })
 
           // Nettoyage anti-opérateurs MongoDB
-          const sanitizedOrder = sanitizeMongo(safeOrder);
+          const sanitizedOrder = sanitizeMongo(safeOrder)
           // Validation stricte du schéma
-          const validatedOrder = OrderSchema.parse(sanitizedOrder);
+          const validatedOrder = OrderSchema.parse(sanitizedOrder)
           db.ordersCollection.insertOne(validatedOrder).then(() => {
-            doc.end();
-          });
+            doc.end()
+          })
         } else {
           next(new Error(`Basket with id=${id} does not exist.`))
         }

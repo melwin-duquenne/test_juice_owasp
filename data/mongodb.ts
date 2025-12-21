@@ -28,8 +28,8 @@ interface BaseDocument {
 }
 
 class SecureCollection<T extends BaseDocument = BaseDocument> {
-  private name: string
-  private documents: Map<string, T> = new Map()
+  private readonly name: string
+  private readonly documents = new Map<string, T>()
   private idCounter: number = 1
 
   constructor (name: string) {
@@ -96,9 +96,9 @@ class SecureCollection<T extends BaseDocument = BaseDocument> {
 
   async insert (doc: T | T[]): Promise<T | T[]> {
     if (Array.isArray(doc)) {
-      return Promise.all(doc.map(d => this.insertOne(d)))
+      return await Promise.all(doc.map(async d => await this.insertOne(d)))
     }
-    return this.insertOne(doc)
+    return await this.insertOne(doc)
   }
 
   async insertOne (doc: T): Promise<T> {

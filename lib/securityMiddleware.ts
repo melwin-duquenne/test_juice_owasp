@@ -13,15 +13,15 @@ import path from 'node:path'
 export const preventPathTraversal = () => {
   return (req: Request, res: Response, next: NextFunction) => {
     const suspiciousPatterns = [
-      /\.\./g,                    // Parent directory traversal
-      /\.\.%2f/gi,                // URL encoded ../
-      /\.\.%5c/gi,                // URL encoded ..\
-      /%2e%2e/gi,                 // Double URL encoded ..
-      /%252e%252e/gi,             // Triple URL encoded ..
-      /\.\.\\|\.\.%5c/gi,         // Windows path traversal
-      /%c0%ae/gi,                 // UTF-8 encoded .
-      /%c1%9c/gi,                 // UTF-8 encoded /
-      /\0|%00/gi,                 // Null byte injection
+      /\.\./g, // Parent directory traversal
+      /\.\.%2f/gi, // URL encoded ../
+      /\.\.%5c/gi, // URL encoded ..\
+      /%2e%2e/gi, // Double URL encoded ..
+      /%252e%252e/gi, // Triple URL encoded ..
+      /\.\.\\|\.\.%5c/gi, // Windows path traversal
+      /%c0%ae/gi, // UTF-8 encoded .
+      /%c1%9c/gi, // UTF-8 encoded /
+      /\0|%00/gi // Null byte injection
     ]
 
     const urlToCheck = decodeURIComponent(req.url)
@@ -212,11 +212,11 @@ export const sanitizeRequestBody = () => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (req.body && typeof req.body === 'object') {
       const dangerousPatterns = [
-        /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,  // Script tags
-        /javascript:/gi,                                         // JavaScript protocol
-        /on\w+\s*=/gi,                                          // Event handlers
-        /\$where/gi,                                            // MongoDB $where injection
-        /\$ne|\$gt|\$lt|\$gte|\$lte|\$in|\$nin|\$or|\$and/gi,   // MongoDB operators
+        /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, // Script tags
+        /javascript:/gi, // JavaScript protocol
+        /on\w+\s*=/gi, // Event handlers
+        /\$where/gi, // MongoDB $where injection
+        /\$ne|\$gt|\$lt|\$gte|\$lte|\$in|\$nin|\$or|\$and/gi // MongoDB operators
       ]
 
       const checkValue = (value: any): boolean => {

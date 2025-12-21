@@ -5,7 +5,7 @@
 
 import { expect } from '@jest/globals'
 import * as frisby from 'frisby'
-import { io, Socket } from 'socket.io-client'
+import { io, type Socket } from 'socket.io-client'
 import { Joi } from 'frisby'
 
 const URL = 'http://localhost:3000'

@@ -3,7 +3,9 @@
     "allow": [
       "Bash(npm audit:*)",
       "Bash(npx tsc:*)",
-      "Bash(npm view:*)"
+      "Bash(npm view:*)",
+      "Bash(npm run lint)",
+      "Bash(npm run lint:fix:*)"
     ]
   }
 }
