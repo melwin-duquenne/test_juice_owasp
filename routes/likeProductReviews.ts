@@ -49,7 +49,10 @@ export function likeProductReviews () {
       // Artificial wait for timing attack challenge
       await sleep(150)
       try {
-        const updatedReview: Review = await db.reviewsCollection.findOne({ _id: objectId })
+        const updatedReview = await db.reviewsCollection.findOne({ _id: objectId })
+        if (!updatedReview) {
+          return res.status(404).json({ error: 'Review not found' })
+        }
         const updatedLikedBy = Array.isArray(updatedReview.likedBy) ? updatedReview.likedBy : []
         updatedLikedBy.push(safeEmail)
 

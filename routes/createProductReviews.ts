@@ -7,7 +7,6 @@ import { type Request, type Response } from 'express'
 
 import * as challengeUtils from '../lib/challengeUtils'
 import { reviewsCollection } from '../data/mongodb'
-import { ObjectId } from 'mongodb'
 import { challenges } from '../data/datacache'
 import * as security from '../lib/insecurity'
 import * as utils from '../lib/utils'
@@ -24,14 +23,14 @@ export function createProductReviews () {
     const sanitize = (str: string) =>
       typeof str === 'string' ? str.replace(/<[^>]*>?/gm, '').replace(/["'\\]/g, '') : ''
 
-    // Validation et sanitation de l'id produit
-    const isValidProductId = typeof req.params.id === 'string' && /^[a-fA-F0-9]{24}$/.test(req.params.id)
-    const safeProductId = isValidProductId ? new ObjectId(req.params.id) : null
+    // Validation et sanitation de l'id produit (numérique)
+    const isValidProductId = typeof req.params.id === 'string' && /^\d+$/.test(req.params.id)
+    const safeProductId = isValidProductId ? parseInt(req.params.id, 10) : null
     const safeMessage = sanitize(req.body.message)
     const safeAuthor = sanitize(req.body.author)
 
     try {
-      if (!isValidProductId || !safeProductId) {
+      if (!isValidProductId || safeProductId === null) {
         return res.status(400).json({ error: 'Invalid product id.' })
       }
       await reviewsCollection.insert({

@@ -58,13 +58,7 @@ export function dataExport () {
         })
       })
 
-      db.ordersCollection.find({ email: updatedEmail }).then((orders: Array<{
-        orderId: string
-        totalPrice: number
-        products: ProductModel[]
-        bonus: number
-        eta: string
-      }>) => {
+      db.ordersCollection.find({ email: updatedEmail }).then((orders) => {
         if (orders.length > 0) {
           orders.forEach(order => {
             userData.orders.push({
@@ -77,21 +71,15 @@ export function dataExport () {
           })
         }
 
-        db.reviewsCollection.find({ author: email }).then((reviews: Array<{
-          message: string
-          author: string
-          product: number
-          likesCount: number
-          likedBy: string
-        }>) => {
+        db.reviewsCollection.find({ author: email }).then((reviews) => {
           if (reviews.length > 0) {
             reviews.forEach(review => {
               userData.reviews.push({
-                message: review.message,
+                message: review.message ?? '',
                 author: review.author,
-                productId: review.product,
-                likesCount: review.likesCount,
-                likedBy: review.likedBy
+                productId: review.product ?? 0,
+                likesCount: review.likesCount ?? 0,
+                likedBy: (review.likedBy ?? []).join(', ')
               })
             })
           }

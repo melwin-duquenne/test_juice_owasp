@@ -7,9 +7,8 @@ import fs from 'node:fs'
 import crypto from 'node:crypto'
 import { type Request, type Response, type NextFunction } from 'express'
 import { type UserModel } from 'models/user'
-import expressJwt from 'express-jwt'
+import { expressjwt } from 'express-jwt'
 import jwt from 'jsonwebtoken'
-import jws from 'jws'
 import sanitizeHtmlLib from 'sanitize-html'
 import sanitizeFilenameLib from 'sanitize-filename'
 import * as utils from './utils'
@@ -20,7 +19,7 @@ import * as utils from './utils'
 import * as z85 from 'z85'
 
 export const publicKey = fs ? fs.readFileSync('encryptionkeys/jwt.pub', 'utf8') : 'placeholder-public-key'
-const privateKey = process.env.PRIVATE_KEY
+const privateKey = process.env.PRIVATE_KEY ?? fs.readFileSync('encryptionkeys/jwt.key', 'utf8')
 
 interface ResponseWithUser {
   status?: string
@@ -28,6 +27,15 @@ interface ResponseWithUser {
   iat?: number
   exp?: number
   bid?: number
+}
+
+interface DecodedToken {
+  data?: {
+    id?: number
+    email?: string
+    role?: string
+    deluxeToken?: string
+  }
 }
 
 interface IAuthenticatedUsers {
@@ -41,7 +49,7 @@ interface IAuthenticatedUsers {
 }
 
 export const hash = (data: string) => crypto.createHash('md5').update(data).digest('hex')
-const HMAC_SECRET = process.env.HMAC_SECRET
+const HMAC_SECRET = process.env.HMAC_SECRET ?? 'Pa$$w0rd!'
 export const hmac = (data: string) => crypto.createHmac('sha256', HMAC_SECRET).update(data).digest('hex')
 
 export const cutOffPoisonNullByte = (str: string) => {
@@ -52,11 +60,31 @@ export const cutOffPoisonNullByte = (str: string) => {
   return str
 }
 
-export const isAuthorized = () => expressJwt(({ secret: publicKey }) as any)
-export const denyAll = () => expressJwt({ secret: '' + Math.random() } as any)
+export const isAuthorized = () => expressjwt({
+  secret: publicKey,
+  algorithms: ['RS256']
+})
+export const denyAll = () => expressjwt({
+  secret: '' + Math.random(),
+  algorithms: ['RS256']
+})
 export const authorize = (user = {}) => jwt.sign(user, privateKey, { expiresIn: '6h', algorithm: 'RS256' })
-export const verify = (token: string) => token ? (jws.verify as ((token: string, secret: string) => boolean))(token, publicKey) : false
-export const decode = (token: string) => { return jws.decode(token)?.payload }
+export const verify = (token: string) => {
+  if (!token) return false
+  try {
+    jwt.verify(token, publicKey, { algorithms: ['RS256'] })
+    return true
+  } catch {
+    return false
+  }
+}
+export const decode = (token: string): DecodedToken | null => {
+  try {
+    return jwt.decode(token) as DecodedToken | null
+  } catch {
+    return null
+  }
+}
 
 export const sanitizeHtml = (html: string) => sanitizeHtmlLib(html)
 export const sanitizeLegacy = (input = '') => input.replace(/<(?:\w+)\W+?[\w]/gi, '')
@@ -134,11 +162,34 @@ export const redirectAllowlist = new Set([
 ])
 
 export const isRedirectAllowed = (url: string) => {
-  let allowed = false
-  for (const allowedUrl of redirectAllowlist) {
-    allowed = allowed || url.includes(allowedUrl) // vuln-code-snippet vuln-line redirectChallenge
+  if (!url) return false
+
+  try {
+    const parsedUrl = new URL(url)
+
+    // Strict validation: check exact match of protocol + host + pathname
+    for (const allowedUrl of redirectAllowlist) {
+      try {
+        const parsedAllowed = new URL(allowedUrl)
+
+        // Protocol and host must match exactly
+        if (parsedUrl.protocol === parsedAllowed.protocol &&
+            parsedUrl.host === parsedAllowed.host) {
+          // Pathname must start with the allowed path
+          if (parsedUrl.pathname === parsedAllowed.pathname ||
+              parsedUrl.pathname.startsWith(parsedAllowed.pathname + '/')) {
+            return true
+          }
+        }
+      } catch {
+        continue
+      }
+    }
+    return false
+  } catch {
+    // Invalid URL format
+    return false
   }
-  return allowed
 }
 // vuln-code-snippet end redirectCryptoCurrencyChallenge redirectChallenge
 
@@ -154,9 +205,15 @@ export const deluxeToken = (email: string) => {
   return hmac.update(email + roles.deluxe).digest('hex')
 }
 
+const getVerifiedToken = (req: Request): DecodedToken | null => {
+  const token = utils.jwtFrom(req)
+  if (!token || !verify(token)) return null
+  return decode(token)
+}
+
 export const isAccounting = () => {
   return (req: Request, res: Response, next: NextFunction) => {
-    const decodedToken = verify(utils.jwtFrom(req)) && decode(utils.jwtFrom(req))
+    const decodedToken = getVerifiedToken(req)
     if (decodedToken?.data?.role === roles.accounting) {
       next()
     } else {
@@ -166,12 +223,12 @@ export const isAccounting = () => {
 }
 
 export const isDeluxe = (req: Request) => {
-  const decodedToken = verify(utils.jwtFrom(req)) && decode(utils.jwtFrom(req))
-  return decodedToken?.data?.role === roles.deluxe && decodedToken?.data?.deluxeToken && decodedToken?.data?.deluxeToken === deluxeToken(decodedToken?.data?.email)
+  const decodedToken = getVerifiedToken(req)
+  return decodedToken?.data?.role === roles.deluxe && decodedToken?.data?.deluxeToken && decodedToken?.data?.deluxeToken === deluxeToken(decodedToken?.data?.email ?? '')
 }
 
 export const isCustomer = (req: Request) => {
-  const decodedToken = verify(utils.jwtFrom(req)) && decode(utils.jwtFrom(req))
+  const decodedToken = getVerifiedToken(req)
   return decodedToken?.data?.role === roles.customer
 }
 

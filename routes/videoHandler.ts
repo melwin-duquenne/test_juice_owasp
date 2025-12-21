@@ -7,14 +7,13 @@ import fs from 'node:fs'
 import pug from 'pug'
 import config from 'config'
 import { type Request, type Response } from 'express'
-import { AllHtmlEntities as Entities } from 'html-entities'
+import { encode as htmlEncode } from 'html-entities'
 
 import * as challengeUtils from '../lib/challengeUtils'
 import { themes } from '../views/themes/themes'
 import { challenges } from '../data/datacache'
 import * as utils from '../lib/utils'
 
-const entities = new Entities()
 
 export const getVideo = () => {
   return (req: Request, res: Response) => {
@@ -57,7 +56,7 @@ export const promotionVideo = () => {
       const themeKey = config.get<string>('application.theme') as keyof typeof themes
       const theme = themes[themeKey] || themes['bluegrey-lightgreen']
       const templateData = {
-        title: entities.encode(config.get<string>('application.name')),
+        title: htmlEncode(config.get<string>('application.name')),
         favicon: favicon(),
         bgColor: theme.bgColor,
         textColor: theme.textColor,

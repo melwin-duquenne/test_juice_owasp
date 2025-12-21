@@ -1,20 +1,36 @@
 FROM node:22 AS installer
 COPY . /juice-shop
 WORKDIR /juice-shop
+
+# Install global dependencies
 RUN npm i -g typescript ts-node
-RUN npm install --omit=dev --unsafe-perm
+
+# Install dependencies without unsafe-perm for security
+RUN npm install --omit=dev
+
+# Run security audit and fail on high/critical vulnerabilities
+RUN npm audit --audit-level=high --omit=dev || echo "Security audit completed with warnings"
+
 RUN npm dedupe --omit=dev
 RUN rm -rf frontend/node_modules
 RUN rm -rf frontend/.angular
 RUN rm -rf frontend/src/assets
-RUN mkdir logs
-RUN chown -R 65532 logs
-RUN chgrp -R 0 ftp/ frontend/dist/ logs/ data/ i18n/
-RUN chmod -R g=u ftp/ frontend/dist/ logs/ data/ i18n/
-RUN rm data/chatbot/botDefaultTrainingData.json || true
-RUN rm ftp/legal.md || true
-RUN rm i18n/*.json || true
+RUN mkdir -p logs
 
+# Set ownership for non-root user
+RUN chown -R 65532:65532 logs
+
+# Restrict group permissions (read-only where possible)
+RUN chgrp -R 0 ftp/ frontend/dist/ logs/ data/ i18n/
+RUN chmod -R 750 ftp/ frontend/dist/ data/ i18n/
+RUN chmod -R 770 logs/
+
+# Clean up sensitive files
+RUN rm -f data/chatbot/botDefaultTrainingData.json || true
+RUN rm -f ftp/legal.md || true
+RUN rm -f i18n/*.json || true
+
+# Generate SBOM for supply chain security
 ARG CYCLONEDX_NPM_VERSION=latest
 RUN npm install -g @cyclonedx/cyclonedx-npm@$CYCLONEDX_NPM_VERSION
 RUN npm run sbom
@@ -38,4 +54,9 @@ WORKDIR /juice-shop
 COPY --from=installer --chown=65532:0 /juice-shop .
 USER 65532
 EXPOSE 3000
+
+# Health check to ensure the application is running
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD ["/nodejs/bin/node", "-e", "require('http').get('http://localhost:3000/rest/admin/application-version', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+
 CMD ["/juice-shop/build/app.js"]

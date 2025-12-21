@@ -25,10 +25,14 @@ export type Card = CardModel
 export type Product = ProductModel
 
 export interface Review {
-  text: string
+  _id?: string
+  text?: string
+  message?: string
   author: string
-  liked: boolean
-  likedBy: string[]
+  product?: number
+  liked?: boolean
+  likesCount?: number
+  likedBy?: string[]
 }
 
 export type Memory = MemoryModel

@@ -148,7 +148,7 @@ describe('/rest/2fa/verify', () => {
   })
 
   it('POST should fail if a unsigned tmp token is used', async () => {
-    const jwtSecret = process.env.JWT_SECRET
+    const jwtSecret = process.env.JWT_SECRET ?? 'test-secret'
     const tmpTokenWurstbrot = jwt.sign({
       userId: 10,
       type: 'password_valid_needs_second_factor_token'

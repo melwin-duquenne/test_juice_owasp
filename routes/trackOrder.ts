@@ -22,7 +22,7 @@ export function trackOrder () {
       return
     }
 
-    challengeUtils.solveIf(challenges.reflectedXssChallenge, () => { return utils.contains(id, '<iframe src="javascript:alert(`xss`)">') })
+    challengeUtils.solveIf(challenges.reflectedXssChallenge, () => { return id !== null && utils.contains(id, '<iframe src="javascript:alert(`xss`)">') })
     // Utilisation d'un objet simple, sans héritage ni prototype
     const safeQuery = Object.create(null)
     safeQuery.orderId = id

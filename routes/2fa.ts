@@ -23,7 +23,12 @@ export async function verify (req: Request, res: Response) {
   const { tmpToken, totpToken } = req.body
 
   try {
-    const { userId, type } = security.verify(tmpToken) && security.decode(tmpToken)
+    if (!security.verify(tmpToken)) {
+      throw new Error('Invalid token')
+    }
+    const decoded = security.decode(tmpToken) as { userId?: number, type?: string } | null
+    const userId = decoded?.userId
+    const type = decoded?.type
 
     if (type !== 'password_valid_needs_second_factor_token') {
       throw new Error('Invalid token type')
@@ -118,11 +123,16 @@ export async function setup (req: Request, res: Response) {
       throw new Error('User has 2fa already setup')
     }
 
-    const { secret, type } = security.verify(setupToken) && security.decode(setupToken)
-    if (type !== 'totp_setup_secret') {
+    if (!security.verify(setupToken)) {
+      throw new Error('Invalid setup token')
+    }
+    const decodedSetup = security.decode(setupToken) as { secret?: string, type?: string } | null
+    const secret = decodedSetup?.secret
+    const setupType = decodedSetup?.type
+    if (setupType !== 'totp_setup_secret') {
       throw new Error('SetupToken is of wrong type')
     }
-    if (!otplib.authenticator.check(initialToken, secret)) {
+    if (!secret || !otplib.authenticator.check(initialToken, secret)) {
       throw new Error('Initial token doesnt match the secret from the setupToken')
     }
 

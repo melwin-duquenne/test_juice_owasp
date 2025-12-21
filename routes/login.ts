@@ -42,7 +42,7 @@ export function login () {
         email,
         password: security.hash(password),
         deletedAt: null
-      }
+      } as any
     })
       .then((authenticatedUser) => {
         const user = utils.queryResultToJson(authenticatedUser)

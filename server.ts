@@ -24,8 +24,6 @@ import robots from 'express-robots-txt'
 import cookieParser from 'cookie-parser'
 import * as Prometheus from 'prom-client'
 import swaggerUi from 'swagger-ui-express'
-import featurePolicy from 'feature-policy'
-import { IpFilter } from 'express-ipfilter'
 // @ts-expect-error FIXME due to non-existing type definitions for express-security.txt
 import securityTxt from 'express-security.txt'
 import { rateLimit } from 'express-rate-limit'
@@ -53,6 +51,7 @@ import logger from './lib/logger'
 import * as utils from './lib/utils'
 import * as antiCheat from './lib/antiCheat'
 import * as security from './lib/insecurity'
+import { preventPathTraversal, additionalSecurityHeaders, sanitizeRequestBody, secureIpFilter } from './lib/securityMiddleware'
 import validateConfig from './lib/startup/validateConfig'
 import cleanupFtpFolder from './lib/startup/cleanupFtpFolder'
 import customizeEasterEgg from './lib/startup/customizeEasterEgg' // vuln-code-snippet hide-line
@@ -182,15 +181,21 @@ restoreOverwrittenFilesWithOriginals().then(() => {
   app.use(cors())
 
   /* Security middleware */
-  app.use(helmet.noSniff())
-  app.use(helmet.frameguard())
-  // app.use(helmet.xssFilter()); // = no protection from persisted XSS via RESTful API
-  app.disable('x-powered-by')
-  app.use(featurePolicy({
-    features: {
-      payment: ["'self'"]
-    }
+  app.use(helmet({
+    contentSecurityPolicy: false, // Géré par additionalSecurityHeaders
+    crossOriginEmbedderPolicy: false, // Désactivé pour compatibilité
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
   }))
+  app.disable('x-powered-by')
+
+  /* Additional security middleware - Path traversal protection */
+  app.use(preventPathTraversal())
+
+  /* Additional security headers */
+  app.use(additionalSecurityHeaders())
+
+  /* Request body sanitization (logging only) */
+  app.use(sanitizeRequestBody())
 
   /* Hiring header */
   app.use((req: Request, res: Response, next: NextFunction) => {
@@ -426,7 +431,7 @@ restoreOverwrittenFilesWithOriginals().then(() => {
   /* Accounting users are allowed to check and update quantities */
   app.delete('/api/Quantitys/:id', security.denyAll())
   app.post('/api/Quantitys', security.denyAll())
-  app.use('/api/Quantitys/:id', security.isAccounting(), IpFilter(['123.456.789'], { mode: 'allow' }))
+  app.use('/api/Quantitys/:id', security.isAccounting(), secureIpFilter(['123.456.789'], { mode: 'allow' }))
   /* Feedbacks: Do not allow changes of existing feedback */
   app.put('/api/Feedbacks/:id', security.denyAll())
   /* PrivacyRequests: Only allowed for authenticated users */

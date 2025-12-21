@@ -36,7 +36,7 @@ export function searchProducts () {
           },
           { deletedAt: null }
         ]
-      },
+      } as any,
       order: [['name', 'ASC']]
     })
       .then((products: any) => {

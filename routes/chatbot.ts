@@ -11,10 +11,10 @@ import jwt, { type JwtPayload, type VerifyErrors } from 'jsonwebtoken'
 import * as challengeUtils from '../lib/challengeUtils'
 import logger from '../lib/logger'
 import config from 'config'
-import download from 'download'
+import axios from 'axios'
 import * as utils from '../lib/utils'
 import { isString } from 'lodash'
-import Bot from 'juicy-chat-bot'
+import SimpleChatBot from '../lib/SimpleChatBot'
 import validateChatBot from '../lib/startup/validateChatBot'
 import * as security from '../lib/insecurity'
 import * as botUtils from '../lib/botUtils'
@@ -22,13 +22,13 @@ import { challenges } from '../data/datacache'
 
 let trainingFile = config.get<string>('application.chatBot.trainingData')
 let testCommand: string
-export let bot: Bot | null = null
+export let bot: SimpleChatBot | null = null
 
 export async function initializeChatbot () {
   if (utils.isUrl(trainingFile)) {
     const file = utils.extractFilename(trainingFile)
-    const data = await download(trainingFile)
-    await fs.writeFile('data/chatbot/' + file, data)
+    const response = await axios.get(trainingFile, { responseType: 'arraybuffer' })
+    await fs.writeFile('data/chatbot/' + file, Buffer.from(response.data))
   }
 
   await fs.copyFile(
@@ -41,7 +41,7 @@ export async function initializeChatbot () {
   validateChatBot(JSON.parse(trainingSet))
 
   testCommand = JSON.parse(trainingSet).data[0].utterances[0]
-  bot = new Bot(config.get('application.chatBot.name'), config.get('application.chatBot.greeting'), trainingSet, config.get('application.chatBot.defaultResponse'))
+  bot = new SimpleChatBot(config.get('application.chatBot.name'), config.get('application.chatBot.greeting'), trainingSet, config.get('application.chatBot.defaultResponse'))
   return bot.train()
 }
 

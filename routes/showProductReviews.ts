@@ -38,12 +38,13 @@ export function showProductReviews () {
     // Mesure du temps d’exécution (pour le challenge uniquement)
     const t0 = new Date().getTime()
 
-    db.reviewsCollection.find({ product: id }).then((reviews: Review[]) => {
+    db.reviewsCollection.find({ product: id }).then((reviews) => {
       const t1 = new Date().getTime()
       challengeUtils.solveIf(challenges.noSqlCommandChallenge, () => { return (t1 - t0) > 2000 })
       const user = security.authenticatedUsers.from(req)
       for (let i = 0; i < reviews.length; i++) {
-        if (user === undefined || reviews[i].likedBy.includes(user.data.email)) {
+        const likedBy = reviews[i].likedBy ?? []
+        if (user === undefined || likedBy.includes(user.data.email)) {
           reviews[i].liked = true
         }
       }

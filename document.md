@@ -221,3 +221,569 @@ Le template Pug est désormais compilé avec des options restrictives (compileDe
 ### Correction : Sanitation de l’objet error dans routes/errorHandler.ts
 
 L’objet error est désormais nettoyé (remplacement des chevrons < et >) avant d’être passé au template Pug, empêchant toute injection de contenu HTML ou scripté dans la page d’erreur.
+
+## SonarQube aprés correction
+
+![Capture de SonarQube aprés la correction des erreurs de sécurité](image_document/SonarCorrection.png)
+
+---
+
+## Analyse et correction des vulnérabilités des dépendances (npm)
+
+### Vulnérabilités détectées via npm audit
+
+L'analyse des dépendances avec `npm audit` a révélé plusieurs vulnérabilités critiques et hautes :
+
+| Package | Version vulnérable | Sévérité | CVE/GHSA | Description |
+|---------|-------------------|----------|----------|-------------|
+| jsonwebtoken | 0.4.0 | **CRITIQUE** | Multiples CVE | Version obsolète (2013) avec nombreuses failles |
+| express-jwt | 0.1.3 | **HAUTE** | GHSA-6g6m-m6h5-w9gf | Bypass d'autorisation |
+| sanitize-html | 1.4.2 | **HAUTE** | Multiples | XSS via contournement de la sanitization |
+| crypto-js (via pdfkit) | < 4.2.0 | **CRITIQUE** | GHSA-xwcq-pm8m-c4vf | PBKDF2 faible |
+| unzipper | 0.9.15 | **HAUTE** | Zip Slip | Path traversal lors de l'extraction |
+| socket.io | 3.1.2 | **HAUTE** | Multiples | Vulnérabilités engine.io/ws |
+| helmet | 4.6.0 | **MOYENNE** | - | Version obsolète |
+| js-yaml | 3.14.0 | **HAUTE** | - | Exécution de code arbitraire |
+| http-server | 0.12.3 | **MOYENNE** | GHSA-jc84-3g44-wf2q | DoS via ecstatic |
+
+### Corrections appliquées dans package.json
+
+Les versions suivantes ont été mises à jour :
+
+```json
+{
+  "jsonwebtoken": "^9.0.2",      // Était: 0.4.0
+  "express-jwt": "^8.4.1",       // Était: 0.1.3
+  "sanitize-html": "^2.13.1",    // Était: 1.4.2
+  "unzipper": "^0.12.3",         // Était: 0.9.15
+  "socket.io": "^4.8.1",         // Était: 3.1.2
+  "helmet": "^8.0.0",            // Était: 4.6.0
+  "pdfkit": "^0.15.2",           // Était: 0.11.0 (corrige crypto-js)
+  "js-yaml": "^4.1.0",           // Était: 3.14.0
+  "socket.io-client": "^4.8.1",  // Était: 3.1.3 (devDep)
+  "http-server": "^14.1.1"       // Était: 0.12.3 (devDep)
+}
+```
+
+---
+
+## Sécurisation du Dockerfile
+
+### Problèmes identifiés
+
+1. **--unsafe-perm** : Option risquée permettant l'exécution de scripts avec des privilèges élevés
+2. **Absence de HEALTHCHECK** : Pas de vérification de l'état de santé du conteneur
+3. **Absence d'audit npm** : Pas de vérification des vulnérabilités pendant le build
+4. **Permissions trop larges** : `g=u` accordait des permissions excessives
+
+### Corrections appliquées
+
+```dockerfile
+# Suppression de --unsafe-perm
+RUN npm install --omit=dev
+
+# Ajout de l'audit de sécurité pendant le build
+RUN npm audit --audit-level=high --omit=dev || echo "Security audit completed with warnings"
+
+# Permissions plus restrictives
+RUN chmod -R 750 ftp/ frontend/dist/ data/ i18n/
+RUN chmod -R 770 logs/
+
+# Ajout du HEALTHCHECK pour la surveillance du conteneur
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD ["/nodejs/bin/node", "-e", "require('http').get('http://localhost:3000/rest/admin/application-version', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+```
+
+---
+
+## Création du middleware de sécurité global
+
+### Nouveau fichier : lib/securityMiddleware.ts
+
+Un nouveau module de sécurité a été créé pour centraliser les protections :
+
+#### 1. Protection contre le Path Traversal
+
+```typescript
+export const preventPathTraversal = () => {
+  // Bloque les patterns suspects :
+  // - ../ et ..\ (traversée de répertoire)
+  // - Encodages URL (%2e, %2f, %5c)
+  // - Encodages UTF-8 (%c0%ae, %c1%9c)
+  // - Injection de null byte (%00)
+}
+```
+
+#### 2. Headers de sécurité supplémentaires
+
+```typescript
+export const additionalSecurityHeaders = () => {
+  // X-Content-Type-Options: nosniff
+  // X-Frame-Options: DENY
+  // X-XSS-Protection: 1; mode=block
+  // Referrer-Policy: strict-origin-when-cross-origin
+  // Permissions-Policy: geolocation=(), microphone=(), camera=()
+  // Content-Security-Policy: default-src 'self'; ...
+}
+```
+
+#### 3. Sanitization des requêtes
+
+```typescript
+export const sanitizeRequestBody = () => {
+  // Détection et logging des patterns dangereux :
+  // - Balises <script>
+  // - Protocole javascript:
+  // - Event handlers (onclick, onerror, etc.)
+  // - Opérateurs MongoDB ($where, $ne, $gt, etc.)
+}
+```
+
+---
+
+## Correction de la validation des redirections
+
+### Vulnérabilité identifiée dans lib/insecurity.ts
+
+L'ancienne implémentation utilisait `url.includes(allowedUrl)` ce qui permettait des contournements :
+
+```typescript
+// VULNÉRABLE - Ancienne version
+export const isRedirectAllowed = (url: string) => {
+  for (const allowedUrl of redirectAllowlist) {
+    allowed = allowed || url.includes(allowedUrl) // Contournable !
+  }
+}
+// Exemple d'attaque : https://evil.com?redirect=https://github.com/juice-shop/juice-shop
+```
+
+### Correction appliquée
+
+```typescript
+// SÉCURISÉ - Nouvelle version
+export const isRedirectAllowed = (url: string) => {
+  try {
+    const parsedUrl = new URL(url)
+    for (const allowedUrl of redirectAllowlist) {
+      const parsedAllowed = new URL(allowedUrl)
+      // Validation stricte : protocol + host doivent correspondre exactement
+      if (parsedUrl.protocol === parsedAllowed.protocol &&
+          parsedUrl.host === parsedAllowed.host) {
+        if (parsedUrl.pathname === parsedAllowed.pathname ||
+            parsedUrl.pathname.startsWith(parsedAllowed.pathname + '/')) {
+          return true
+        }
+      }
+    }
+    return false
+  } catch {
+    return false // URL invalide = rejetée
+  }
+}
+```
+
+---
+
+## Intégration des middlewares dans server.ts
+
+Les middlewares de sécurité ont été intégrés dans le fichier principal du serveur :
+
+```typescript
+import { preventPathTraversal, additionalSecurityHeaders, sanitizeRequestBody } from './lib/securityMiddleware'
+
+// Dans la configuration de l'application :
+
+/* Additional security middleware - Path traversal protection */
+app.use(preventPathTraversal())
+
+/* Additional security headers */
+app.use(additionalSecurityHeaders())
+
+/* Request body sanitization (logging only) */
+app.use(sanitizeRequestBody())
+```
+
+---
+
+## Résumé des améliorations de sécurité
+
+| Catégorie | Avant | Après |
+|-----------|-------|-------|
+| Dépendances vulnérables | 10+ packages critiques/hauts | Mis à jour vers versions sécurisées |
+| Docker | --unsafe-perm, pas de healthcheck | Permissions restrictives, healthcheck, audit |
+| Path Traversal | Protection partielle | Middleware global avec patterns multiples |
+| Redirections | Validation par includes() | Validation stricte URL parsée |
+| Headers HTTP | Helmet basique | Headers CSP, Permissions-Policy ajoutés |
+| Monitoring | Aucun logging sécurité | Logging des tentatives d'injection |
+
+---
+
+## Corrections de compatibilité et packages obsolètes
+
+### Packages obsolètes identifiés et remplacés
+
+| Package | Problème | Solution |
+|---------|----------|----------|
+| `jws` | Redondant avec jsonwebtoken, vulnérabilités potentielles | Supprimé, remplacé par `jwt.decode()` de jsonwebtoken |
+| `node-pre-gyp` | Déprécié | Remplacé par `@mapbox/node-pre-gyp` |
+| `notevil` | Exécution de code avec contournements connus | Supprimé (non utilisé directement) |
+| `feature-policy` | Obsolète, remplacé par Permissions-Policy | Supprimé, intégré via helmet 8.x |
+| `html-entities` v1 | API obsolète | Mis à jour vers v2.5.2 avec nouvelle API |
+
+### Correction de express-jwt (v0.1.3 → v8.4.1)
+
+**Problème** : L'API de express-jwt a complètement changé entre les versions.
+
+**Fichier modifié** : `lib/insecurity.ts`
+
+```typescript
+// AVANT (v0.1.3) - VULNÉRABLE
+import expressJwt from 'express-jwt'
+export const isAuthorized = () => expressJwt(({ secret: publicKey }) as any)
+
+// APRÈS (v8.4.1) - SÉCURISÉ
+import { expressjwt } from 'express-jwt'
+export const isAuthorized = () => expressjwt({
+  secret: publicKey,
+  algorithms: ['RS256']  // Algorithme obligatoire maintenant
+})
+```
+
+**Amélioration de sécurité** : La spécification explicite des algorithmes empêche les attaques de type "algorithm confusion".
+
+### Suppression de jws au profit de jsonwebtoken
+
+**Fichiers modifiés** : `lib/insecurity.ts`, `routes/verify.ts`
+
+```typescript
+// AVANT - Utilisation de jws
+import jws from 'jws'
+export const verify = (token: string) => jws.verify(token, publicKey)
+export const decode = (token: string) => jws.decode(token)?.payload
+
+// APRÈS - Utilisation de jsonwebtoken uniquement
+import jwt from 'jsonwebtoken'
+export const verify = (token: string) => {
+  try {
+    jwt.verify(token, publicKey, { algorithms: ['RS256'] })
+    return true
+  } catch {
+    return false
+  }
+}
+export const decode = (token: string) => jwt.decode(token)
+```
+
+### Mise à jour de html-entities (v1 → v2)
+
+**Fichier modifié** : `lib/challengeUtils.ts`
+
+```typescript
+// AVANT (v1) - API obsolète
+import { AllHtmlEntities as Entities } from 'html-entities'
+const entities = new Entities()
+entities.decode(html)
+
+// APRÈS (v2) - Nouvelle API
+import { decode as htmlDecode } from 'html-entities'
+htmlDecode(html)
+```
+
+### Remplacement de feature-policy par helmet intégré
+
+**Fichier modifié** : `server.ts`
+
+```typescript
+// AVANT - Package obsolète
+import featurePolicy from 'feature-policy'
+app.use(featurePolicy({ features: { payment: ["'self'"] } }))
+
+// APRÈS - Configuration helmet moderne
+app.use(helmet({
+  contentSecurityPolicy: false,  // Géré séparément
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
+}))
+// + Permissions-Policy via additionalSecurityHeaders middleware
+```
+
+### Types TypeScript supprimés (obsolètes)
+
+Les packages suivants incluent maintenant leurs propres définitions TypeScript :
+
+- `@types/express-jwt` → express-jwt 8.x inclut ses types
+- `@types/socket.io` → socket.io 4.x inclut ses types
+- `@types/socket.io-client` → socket.io-client 4.x inclut ses types
+- `@types/jws` → Package jws supprimé
+
+---
+
+## Résumé final des fichiers modifiés
+
+| Fichier | Type de modification |
+|---------|---------------------|
+| `package.json` | Mise à jour dépendances, suppression packages obsolètes |
+| `Dockerfile` | Sécurisation build, ajout healthcheck |
+| `lib/insecurity.ts` | Correction express-jwt, jws, validation redirections |
+| `lib/securityMiddleware.ts` | **Nouveau** - Middlewares de sécurité |
+| `lib/challengeUtils.ts` | Mise à jour html-entities |
+| `routes/verify.ts` | Suppression jws |
+| `server.ts` | Intégration middlewares, suppression feature-policy |
+| `document.md` | Documentation complète |
+
+---
+
+## Corrections des vulnérabilités npm audit
+
+### Vulnérabilités CRITIQUES corrigées
+
+#### 1. marsdb - Command Injection (GHSA-5mrr-rgp6-x4gr)
+
+**Problème** : Le package marsdb contenait une vulnérabilité d'injection de commandes critique sans correctif disponible.
+
+**Solution** : Remplacement complet par une implémentation sécurisée en mémoire.
+
+**Fichier modifié** : `data/mongodb.ts`
+
+```typescript
+// AVANT - Vulnérable
+import * as MarsDB from 'marsdb'
+export const reviewsCollection = new MarsDB.Collection('posts')
+
+// APRÈS - Implémentation sécurisée
+class SecureCollection {
+  private documents: Map<string, Document> = new Map()
+  // API compatible : find(), findOne(), insert(), update(), count()
+}
+export const reviewsCollection = new SecureCollection('reviews')
+```
+
+#### 2. vm2 via juicy-chat-bot - Sandbox Escape (GHSA-whpj-8f3w-67p5) - CORRIGÉ
+
+**Problème** : Le package vm2 a des vulnérabilités de sandbox escape critiques. Il était utilisé par juicy-chat-bot.
+
+**Solution** : Création d'une implémentation alternative `SimpleChatBot` qui n'utilise pas vm2.
+
+**Fichiers créés/modifiés** :
+- `lib/SimpleChatBot.ts` - Nouvelle implémentation sécurisée
+- `routes/chatbot.ts` - Utilise SimpleChatBot au lieu de juicy-chat-bot
+- `package.json` - juicy-chat-bot supprimé
+
+```typescript
+// lib/SimpleChatBot.ts - Implémentation sécurisée
+class SimpleChatBot {
+  // Utilise fuzzy matching (fuzzball) au lieu de vm2
+  // Même API que juicy-chat-bot pour la compatibilité
+  // Pas de dépendance à vm2
+}
+```
+
+### Vulnérabilités HIGH corrigées
+
+#### 3. express-ipfilter/ip - SSRF (GHSA-2p57-rm9w-gvfp)
+
+**Problème** : Le package `ip` utilisé par express-ipfilter a une vulnérabilité SSRF.
+
+**Solution** : Création d'un middleware de filtrage IP sécurisé.
+
+**Fichier créé** : `lib/securityMiddleware.ts`
+
+```typescript
+// Nouveau middleware secureIpFilter remplaçant express-ipfilter
+export const secureIpFilter = (allowedIps: string[], options: { mode: 'allow' | 'deny' }) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const clientIp = getClientIp(req) // Extraction sécurisée
+    // Validation sans utiliser le package 'ip' vulnérable
+  }
+}
+```
+
+#### 4. download/got/http-cache-semantics - Multiple vulnérabilités
+
+**Problème** : Le package `download` dépend de `got` et `http-cache-semantics` vulnérables.
+
+**Solution** : Remplacement par `axios` (déjà présent dans le projet).
+
+**Fichiers modifiés** : `lib/utils.ts`, `routes/chatbot.ts`
+
+```typescript
+// AVANT
+import download from 'download'
+const data = await download(url)
+
+// APRÈS
+import axios from 'axios'
+const response = await axios.get(url, { responseType: 'arraybuffer' })
+const data = Buffer.from(response.data)
+```
+
+#### 5. check-dependencies/braces - DoS (GHSA-grv7-fg5c-xmjg)
+
+**Problème** : Versions anciennes de braces via check-dependencies.
+
+**Solution** : Mise à jour vers check-dependencies@2.0.0
+
+### Vulnérabilités MODERATE corrigées
+
+#### 6. mocha/minimatch/nanoid
+
+**Problème** : Dépendances vulnérables dans mocha.
+
+**Solution** : Mise à jour vers mocha@11.1.0
+
+#### 7. @cyclonedx/cyclonedx-npm
+
+**Problème** : Versions vulnérables de xmlbuilder2/js-yaml.
+
+**Solution** : Mise à jour vers @cyclonedx/cyclonedx-npm@4.1.2
+
+### Packages supprimés
+
+| Package | Raison |
+|---------|--------|
+| `marsdb` | Remplacé par implémentation sécurisée |
+| `express-ipfilter` | Remplacé par secureIpFilter |
+| `download` | Remplacé par axios |
+| `@types/download` | Plus nécessaire |
+
+---
+
+## Vulnérabilités restantes (non corrigeables)
+
+| Package | Sévérité | Raison |
+|---------|----------|--------|
+| `grunt-replace-json` (lodash.set) | HIGH | Pas de correctif disponible - outil de build uniquement |
+
+**Note** : La vulnérabilité `juicy-chat-bot` (vm2) a été **corrigée** en remplaçant le package par une implémentation sécurisée `SimpleChatBot`.
+
+**Recommandations pour les vulnérabilités restantes** :
+1. **grunt-replace-json** : Utiliser uniquement en développement, pas en production. Ce package est utilisé pour le packaging et n'affecte pas l'application en production.
+
+---
+
+## Corrections TypeScript et compatibilité API
+
+### Corrections html-entities dans tous les fichiers
+
+**Problème** : L'API de html-entities v1 (`AllHtmlEntities`) n'existe plus dans la v2.
+
+**Fichiers corrigés** :
+- `data/datacreator.ts`
+- `routes/userProfile.ts`
+- `routes/videoHandler.ts`
+
+```typescript
+// AVANT
+import { AllHtmlEntities as Entities } from 'html-entities'
+const entities = new Entities()
+entities.encode(text)
+
+// APRÈS
+import { encode as htmlEncode } from 'html-entities'
+htmlEncode(text)
+```
+
+### Corrections des types Socket.IO
+
+**Problème** : `SocketIOClientStatic` n'existe plus dans socket.io v4.
+
+**Fichiers corrigés** :
+- `lib/challengeUtils.ts`
+- `lib/startup/registerWebsocketEvents.ts`
+- `test/api/socketSpec.ts`
+- `test/api/vulnCodeFixesSpec.ts`
+- `test/api/vulnCodeSnippetSpec.ts`
+
+```typescript
+// AVANT
+import io from 'socket.io-client'
+let socket: SocketIOClient.Socket
+
+// APRÈS
+import { io, Socket } from 'socket.io-client'
+let socket: Socket
+```
+
+### Correction types JWT dans lib/insecurity.ts
+
+**Problème** : Le retour de `verify() && decode()` créait un type union avec `false`.
+
+**Solution** : Création d'une fonction helper `getVerifiedToken()`.
+
+```typescript
+const getVerifiedToken = (req: Request): DecodedToken | null => {
+  const token = utils.jwtFrom(req)
+  if (!token || !verify(token)) return null
+  return decode(token)
+}
+```
+
+### Correction SecureCollection types génériques
+
+**Problème** : Les types `Document` trop génériques causaient des erreurs de typage.
+
+**Solution** : SecureCollection est maintenant générique avec types spécifiques pour Review et Order.
+
+```typescript
+// data/mongodb.ts
+class SecureCollection<T extends BaseDocument = BaseDocument> {
+  async find(query: Record<string, any> = {}): Promise<T[]>
+  async findOne(query: Record<string, any> = {}): Promise<T | null>
+  // ...
+}
+
+export const reviewsCollection = new SecureCollection<Review>('reviews')
+export const ordersCollection = new SecureCollection<Order>('orders')
+```
+
+---
+
+## Corrections Frontend
+
+### Mise à jour socket.io-client dans frontend/package.json
+
+**Problème** : socket.io-client 3.1.0 avait des vulnérabilités.
+
+**Solution** : Mise à jour vers 4.8.1
+
+```json
+{
+  "socket.io-client": "^4.8.1"  // Était: ^3.1.0
+}
+```
+
+### Vulnérabilités restantes dans le frontend
+
+| Package | Sévérité | Raison |
+|---------|----------|--------|
+| `postcss` (via stylelint) | MODERATE | Dépendances dev pour linting SCSS |
+
+**Recommandation** : Ces vulnérabilités sont dans des outils de développement (stylelint) et n'affectent pas l'application en production.
+
+---
+
+## Recommandations post-correction
+
+1. **Réinstaller les dépendances** :
+   ```bash
+   rm -rf node_modules package-lock.json
+   npm install
+   ```
+
+2. **Vérifier l'audit npm** :
+   ```bash
+   npm audit
+   ```
+
+3. **Tester l'application** :
+   ```bash
+   npm run test
+   npm run lint
+   ```
+
+4. **Rebuilder l'image Docker** :
+   ```bash
+   docker build -t juice-shop-secure .
+   ```
+
+---

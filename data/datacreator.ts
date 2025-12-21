@@ -30,13 +30,12 @@ import * as utils from '../lib/utils'
 import type { StaticUser, StaticUserAddress, StaticUserCard } from './staticData'
 import { loadStaticChallengeData, loadStaticDeliveryData, loadStaticUserData, loadStaticSecurityQuestionsData } from './staticData'
 import { ordersCollection, reviewsCollection } from './mongodb'
-import { AllHtmlEntities as Entities } from 'html-entities'
+import { encode as htmlEncode, decode as htmlDecode } from 'html-entities'
 import * as datacache from './datacache'
 import * as security from '../lib/insecurity'
 // @ts-expect-error FIXME due to non-existing type definitions for replace
 import replace from 'replace'
 
-const entities = new Entities()
 
 export default async () => {
   const creators = [
@@ -77,7 +76,7 @@ async function createChallenges () {
       // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
       const { enabled: isChallengeEnabled, disabledBecause } = utils.getChallengeEnablementStatus({ disabledEnv: disabledEnv?.join(';') ?? '' } as ChallengeModel)
       description = description.replace('juice-sh.op', config.get<string>('application.domain'))
-      description = description.replace('&lt;iframe width=&quot;100%&quot; height=&quot;166&quot; scrolling=&quot;no&quot; frameborder=&quot;no&quot; allow=&quot;autoplay&quot; src=&quot;https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/771984076&amp;color=%23ff5500&amp;auto_play=true&amp;hide_related=false&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false&amp;show_teaser=true&quot;&gt;&lt;/iframe&gt;', entities.encode(config.get('challenges.xssBonusPayload')))
+      description = description.replace('&lt;iframe width=&quot;100%&quot; height=&quot;166&quot; scrolling=&quot;no&quot; frameborder=&quot;no&quot; allow=&quot;autoplay&quot; src=&quot;https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/771984076&amp;color=%23ff5500&amp;auto_play=true&amp;hide_related=false&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false&amp;show_teaser=true&quot;&gt;&lt;/iframe&gt;', htmlEncode(config.get('challenges.xssBonusPayload')))
       const hasCodingChallenge = challengeKeysWithCodeChallenges.includes(key)
 
       if (hasCodingChallenge) {
