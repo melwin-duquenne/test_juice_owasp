@@ -1,35 +1,43 @@
 describe('/redirect', () => {
-  describe('challenge "redirect"', () => {
+  describe('redirect validation', () => {
     it('should show error page when supplying an unrecognized target URL', () => {
-      cy.visit('/redirect?to=http://kimminich.de', {
+      cy.request({
+        url: '/redirect?to=http://kimminich.de',
         failOnStatusCode: false
+      }).then((response) => {
+        // Unrecognized URLs should be blocked
+        expect(response.status).to.be.oneOf([400, 403, 406])
       })
-      cy.contains('Unrecognized target URL for redirect: http://kimminich.de')
     })
-  })
 
-  describe('challenge "redirect"', () => {
-    it('should redirect to target URL if allowlisted URL is contained in it as parameter', () => {
-      cy.visit(
-        '/redirect?to=https://owasp.org?trickIndexOf=https://github.com/juice-shop/juice-shop',
-        {
-          failOnStatusCode: false
-        }
-      )
-      cy.url().should('match', /https:\/\/owasp\.org/)
-      cy.expectChallengeSolved({ challenge: 'Allowlist Bypass' })
+    it('should block allowlist bypass attempts with trickIndexOf parameter', () => {
+      cy.request({
+        url: '/redirect?to=https://owasp.org?trickIndexOf=https://github.com/juice-shop/juice-shop',
+        failOnStatusCode: false
+      }).then((response) => {
+        // Allowlist bypass should be blocked
+        expect(response.status).to.be.oneOf([400, 403, 406])
+      })
     })
-  })
 
-  describe('challenge "redirectCryptoCurrency"', () => {
-    it('should still redirect to forgotten entry https://etherscan.io/address/0x0f933ab9fcaaa782d0279c300d73750e1311eae6 on allowlist', () => {
-      cy.visit(
-        '/redirect?to=https://etherscan.io/address/0x0f933ab9fcaaa782d0279c300d73750e1311eae6',
-        {
-          failOnStatusCode: false
-        }
-      )
-      cy.expectChallengeSolved({ challenge: 'Outdated Allowlist' })
+    it('should block redirects to cryptocurrency addresses', () => {
+      cy.request({
+        url: '/redirect?to=https://etherscan.io/address/0x0f933ab9fcaaa782d0279c300d73750e1311eae6',
+        failOnStatusCode: false
+      }).then((response) => {
+        // Outdated allowlist entries should be blocked
+        expect(response.status).to.be.oneOf([400, 403, 406])
+      })
+    })
+
+    it('should block redirects to evil domains', () => {
+      cy.request({
+        url: '/redirect?to=https://evil.com',
+        failOnStatusCode: false
+      }).then((response) => {
+        // Evil domains should be blocked
+        expect(response.status).to.be.oneOf([400, 403, 406])
+      })
     })
   })
 })

@@ -24,7 +24,7 @@ export function errorHandler () {
     // Échappement strict pour HTML
     function escapeHtml (str: string) {
       return str.replace(/[&<>"']/g, function (c) {
-        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] || c
+        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? c
       })
     }
     const safeError = typeof error === 'string'

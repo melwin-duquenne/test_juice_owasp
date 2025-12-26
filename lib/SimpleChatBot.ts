@@ -111,7 +111,7 @@ class SimpleChatBot {
    */
   greet (userId: string): string {
     const user = this.users.get(userId)
-    const username = user?.username || 'customer'
+    const username = user?.username ?? 'customer'
     return this.greeting.replace(/<customer-name>/g, username)
   }
 

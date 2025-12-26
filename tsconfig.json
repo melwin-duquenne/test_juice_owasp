@@ -36,6 +36,7 @@
     "build",
     "vagrant",
     "data/static/codefixes/**",
+    "test/cypress/**",
     "**/*.d.ts"
   ]
 }

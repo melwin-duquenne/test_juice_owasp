@@ -190,11 +190,11 @@ export function observeMetrics () {
       accuracyMetrics.set({ phase: 'find it' }, accuracy.totalFindItAccuracy())
       accuracyMetrics.set({ phase: 'fix it' }, accuracy.totalFixItAccuracy())
 
-      ordersCollection.count({}).then((orderCount: number) => {
+      void ordersCollection.count({}).then((orderCount: number) => {
         if (orderCount) orderMetrics.set(orderCount)
       })
 
-      reviewsCollection.count({}).then((reviewCount: number) => {
+      void reviewsCollection.count({}).then((reviewCount: number) => {
         if (reviewCount) interactionsMetrics.set({ type: 'review' }, reviewCount)
       })
 

@@ -12,16 +12,18 @@ import path from 'node:path'
  */
 export const preventPathTraversal = () => {
   return (req: Request, res: Response, next: NextFunction) => {
+    // Note: Don't use 'g' flag with .test() as it maintains lastIndex state
+    // which causes inconsistent behavior across requests
     const suspiciousPatterns = [
-      /\.\./g, // Parent directory traversal
-      /\.\.%2f/gi, // URL encoded ../
-      /\.\.%5c/gi, // URL encoded ..\
-      /%2e%2e/gi, // Double URL encoded ..
-      /%252e%252e/gi, // Triple URL encoded ..
-      /\.\.\\|\.\.%5c/gi, // Windows path traversal
-      /%c0%ae/gi, // UTF-8 encoded .
-      /%c1%9c/gi, // UTF-8 encoded /
-      /\0|%00/gi // Null byte injection
+      /\.\./, // Parent directory traversal
+      /\.\.%2f/i, // URL encoded ../
+      /\.\.%5c/i, // URL encoded ..\
+      /%2e%2e/i, // Double URL encoded ..
+      /%252e%252e/i, // Triple URL encoded ..
+      /\.\.\\|\.\.%5c/i, // Windows path traversal
+      /%c0%ae/i, // UTF-8 encoded .
+      /%c1%9c/i, // UTF-8 encoded /
+      /\0|%00/i // Null byte injection
     ]
 
     const urlToCheck = decodeURIComponent(req.url)
@@ -89,7 +91,6 @@ export const validateRedirectUrl = (allowedUrls: Set<string>) => {
 
     try {
       const parsedUrl = new URL(url)
-      const normalizedUrl = `${parsedUrl.protocol}//${parsedUrl.host}${parsedUrl.pathname}`
 
       // Check for exact match or if the URL starts with an allowed URL
       for (const allowedUrl of allowedUrls) {
@@ -134,9 +135,9 @@ export const additionalSecurityHeaders = () => {
     res.setHeader('Content-Security-Policy',
       "default-src 'self'; " +
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
-      "style-src 'self' 'unsafe-inline'; " +
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
       "img-src 'self' data: https:; " +
-      "font-src 'self' data:; " +
+      "font-src 'self' data: https://fonts.gstatic.com; " +
       "connect-src 'self' wss: ws:; " +
       "frame-ancestors 'none';"
     )
@@ -202,7 +203,73 @@ function getClientIp (req: Request): string {
   }
 
   // Fall back to socket remote address
-  return req.socket?.remoteAddress || req.ip || 'unknown'
+  return req.socket?.remoteAddress ?? req.ip ?? 'unknown'
+}
+
+/**
+ * Middleware to block access to sensitive files
+ * Prevents access to sitemap.xml, .htaccess, web.config, and other sensitive files
+ */
+export const blockSensitiveFiles = () => {
+  const blockedFiles = [
+    /sitemap\.xml$/i,
+    /\.htaccess$/i,
+    /\.htpasswd$/i,
+    /web\.config$/i,
+    /\.git/i,
+    /\.svn/i,
+    /\.env$/i,
+    /\.bak$/i,
+    /\.backup$/i,
+    /\.old$/i,
+    /\.orig$/i,
+    /\.save$/i,
+    /\.swp$/i,
+    /~$/,
+    /\.log$/i,
+    /\.sql$/i,
+    /\.sqlite$/i,
+    /composer\.(json|lock)$/i,
+    /package-lock\.json$/i,
+    /yarn\.lock$/i,
+    /Gemfile(\.lock)?$/i,
+    /\.npmrc$/i,
+    /\.yarnrc$/i,
+    /\.docker/i,
+    /Dockerfile$/i,
+    /docker-compose/i,
+    /\.aws/i,
+    /\.ssh/i,
+    /id_rsa/i,
+    /\.pem$/i,
+    /\.key$/i,
+    /\.crt$/i,
+    /\.cer$/i,
+    /phpinfo\.php$/i,
+    /\.php$/i,
+    /\.asp$/i,
+    /\.aspx$/i,
+    /\.jsp$/i,
+    /wp-config/i,
+    /config\.php$/i,
+    /settings\.php$/i
+  ]
+
+  return (req: Request, res: Response, next: NextFunction) => {
+    const requestPath = req.path.toLowerCase()
+
+    for (const pattern of blockedFiles) {
+      if (pattern.test(requestPath)) {
+        res.status(404).json({
+          error: 'Not Found',
+          message: 'The requested resource does not exist'
+        })
+        return
+      }
+    }
+
+    next()
+  }
 }
 
 /**

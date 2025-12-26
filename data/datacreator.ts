@@ -30,7 +30,7 @@ import * as utils from '../lib/utils'
 import type { StaticUser, StaticUserAddress, StaticUserCard } from './staticData'
 import { loadStaticChallengeData, loadStaticDeliveryData, loadStaticUserData, loadStaticSecurityQuestionsData } from './staticData'
 import { ordersCollection, reviewsCollection } from './mongodb'
-import { encode as htmlEncode, decode as htmlDecode } from 'html-entities'
+import { encode as htmlEncode } from 'html-entities'
 import * as datacache from './datacache'
 import * as security from '../lib/insecurity'
 // @ts-expect-error FIXME due to non-existing type definitions for replace

@@ -26,7 +26,7 @@ function sanitizeMongo (obj: any) {
   if (obj && typeof obj === 'object') {
     for (const key in obj) {
       if (key.startsWith('$') || key.includes('.')) {
-        delete obj[key]
+        Reflect.deleteProperty(obj, key)
       } else {
         sanitizeMongo(obj[key])
       }
@@ -180,7 +180,7 @@ export function placeOrder () {
             ? basketProducts.map(p => ({
               quantity: Number(p.quantity),
               id: typeof p.id === 'number' && Number.isInteger(p.id) && p.id > 0 ? p.id : undefined,
-              name: typeof p.name === 'string' ? p.name.replace(/[^\w\s\-]/g, '').slice(0, 128) : '',
+              name: typeof p.name === 'string' ? p.name.replace(/[^\w\s-]/g, '').slice(0, 128) : '',
               price: Number(p.price),
               total: Number(p.total),
               bonus: Number(p.bonus)
@@ -218,7 +218,7 @@ export function placeOrder () {
           const sanitizedOrder = sanitizeMongo(safeOrder)
           // Validation stricte du schéma
           const validatedOrder = OrderSchema.parse(sanitizedOrder)
-          db.ordersCollection.insertOne(validatedOrder).then(() => {
+          void db.ordersCollection.insertOne(validatedOrder).then(() => {
             doc.end()
           })
         } else {

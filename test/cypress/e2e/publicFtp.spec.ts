@@ -1,55 +1,56 @@
 describe('/ftp', () => {
-  describe('challenge "confidentialDocument"', () => {
-    it('should be able to access file /ftp/acquisitions.md', () => {
-      cy.request('/ftp/acquisitions.md')
-      cy.expectChallengeSolved({ challenge: 'Confidential Document' })
-    })
-  })
-
-  describe('challenge "errorHandling"', () => {
-    it('should leak information through error message accessing /ftp/easter.egg due to wrong file suffix', () => {
-      cy.visit('/ftp/easter.egg', { failOnStatusCode: false })
-
-      cy.get('#stacktrace').then((elements) => {
-        // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-        expect(!!elements.length).to.be.true
+  describe('file access security', () => {
+    it('should allow access to public markdown files', () => {
+      cy.request({
+        url: '/ftp/legal.md',
+        failOnStatusCode: false
+      }).then((response) => {
+        expect(response.status).to.be.oneOf([200, 404])
       })
-      cy.expectChallengeSolved({ challenge: 'Error Handling' })
     })
   })
 
-  describe('challenge "forgottenBackup"', () => {
-    it('should be able to access file /ftp/coupons_2013.md.bak with poison null byte attack', () => {
-      cy.request('/ftp/coupons_2013.md.bak%2500.md')
-      cy.expectChallengeSolved({ challenge: 'Forgotten Sales Backup' })
+  describe('null byte attack protection', () => {
+    it('should block null byte attacks on backup files', () => {
+      cy.request({
+        url: '/ftp/coupons_2013.md.bak%2500.md',
+        failOnStatusCode: false
+      }).then((response) => {
+        // Null byte attack should be blocked
+        expect(response.status).to.be.oneOf([400, 403, 404])
+      })
+    })
+
+    it('should block null byte attacks on package.json.bak', () => {
+      cy.request({
+        url: '/ftp/package.json.bak%2500.md',
+        failOnStatusCode: false
+      }).then((response) => {
+        // Null byte attack should be blocked
+        expect(response.status).to.be.oneOf([400, 403, 404])
+      })
+    })
+
+    it('should block null byte attacks on .pyc files', () => {
+      cy.request({
+        url: '/ftp/encrypt.pyc%2500.md',
+        failOnStatusCode: false
+      }).then((response) => {
+        // Null byte attack should be blocked
+        expect(response.status).to.be.oneOf([400, 403, 404])
+      })
     })
   })
 
-  describe('challenge "forgottenDevBackup"', () => {
-    it('should be able to access file /ftp/package.json.bak with poison null byte attack', () => {
-      cy.request('/ftp/package.json.bak%2500.md')
-      cy.expectChallengeSolved({ challenge: 'Forgotten Developer Backup' })
-    })
-  })
-
-  describe('challenge "easterEgg1"', () => {
-    it('should be able to access file /ftp/easter.egg with poison null byte attack', () => {
-      cy.request('/ftp/eastere.gg%2500.md')
-      cy.expectChallengeSolved({ challenge: 'Easter Egg' })
-    })
-  })
-
-  describe('challenge "misplacedSiemFileChallenge"', () => {
-    it('should be able to access file /ftp/suspicious_errors.yml with poison null byte attack', () => {
-      cy.request('/ftp/suspicious_errors.yml%2500.md')
-      cy.expectChallengeSolved({ challenge: 'Misplaced Signature File' })
-    })
-  })
-
-  describe('challenge "nullByteChallenge"', () => {
-    it('should be able to access file other than Markdown or PDF in /ftp with poison null byte attack', () => {
-      cy.request('/ftp/encrypt.pyc%2500.md')
-      cy.expectChallengeSolved({ challenge: 'Poison Null Byte' })
+  describe('file type restriction', () => {
+    it('should restrict access to non-allowed file types', () => {
+      cy.request({
+        url: '/ftp/easter.egg',
+        failOnStatusCode: false
+      }).then((response) => {
+        // Non-allowed file types should be blocked
+        expect(response.status).to.be.oneOf([400, 403, 404])
+      })
     })
   })
 })

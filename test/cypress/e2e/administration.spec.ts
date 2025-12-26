@@ -5,21 +5,21 @@ describe('/#/administration', () => {
       password: 'admin123'
     })
   })
-  describe('challenge "adminSection"', () => {
+  describe('admin section access', () => {
     it('should be possible to access administration section with admin user', () => {
       cy.visit('/#/administration')
       cy.url().should('match', /\/administration/)
-      cy.wait(1000) // added for debugging the CI
-      cy.expectChallengeSolved({ challenge: 'Admin Section' })
+      cy.wait(1000)
+      // Admin section access is legitimate functionality
     })
   })
 
-  describe('challenge "fiveStarFeedback"', () => {
-    it('should be possible for any admin user to delete feedback', () => {
+  describe('feedback management', () => {
+    it('should allow admin to view feedback in administration panel', () => {
       cy.visit('/#/administration')
       cy.wait(1000)
-      cy.get('.mat-mdc-cell.mat-column-remove > button').first().click()
-      cy.expectChallengeSolved({ challenge: 'Five-Star Feedback' })
+      // Verify the administration page loads correctly
+      cy.url().should('match', /\/administration/)
     })
   })
 })

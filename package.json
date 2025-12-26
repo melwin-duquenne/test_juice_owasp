@@ -117,6 +117,7 @@
     ]
   },
   "dependencies": {
+    "@mapbox/node-pre-gyp": "^1.0.11",
     "axios": "^1.13.2",
     "body-parser": "^1.20.2",
     "check-dependencies": "^2.0.0",
@@ -127,6 +128,7 @@
     "config": "^3.3.12",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
     "dottie": "^2.0.6",
     "errorhandler": "^1.5.1",
     "ethers": "^6.13.2",
@@ -135,6 +137,7 @@
     "express-rate-limit": "^7.5.0",
     "express-robots-txt": "^0.4.1",
     "express-security.txt": "^2.0.0",
+    "feature-policy": "^0.6.0",
     "file-stream-rotator": "^1.0.0",
     "file-type": "^16.5.4",
     "filesniffer": "^1.0.3",
@@ -159,7 +162,6 @@
     "mongodb": "^7.0.0",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
-    "@mapbox/node-pre-gyp": "^1.0.11",
     "on-finished": "^2.3.0",
     "otplib": "^12.0.1",
     "pdfkit": "^0.15.2",

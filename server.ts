@@ -51,7 +51,7 @@ import logger from './lib/logger'
 import * as utils from './lib/utils'
 import * as antiCheat from './lib/antiCheat'
 import * as security from './lib/insecurity'
-import { preventPathTraversal, additionalSecurityHeaders, sanitizeRequestBody, secureIpFilter } from './lib/securityMiddleware'
+import { preventPathTraversal, additionalSecurityHeaders, sanitizeRequestBody, secureIpFilter, blockSensitiveFiles } from './lib/securityMiddleware'
 import validateConfig from './lib/startup/validateConfig'
 import cleanupFtpFolder from './lib/startup/cleanupFtpFolder'
 import customizeEasterEgg from './lib/startup/customizeEasterEgg' // vuln-code-snippet hide-line
@@ -190,6 +190,9 @@ restoreOverwrittenFilesWithOriginals().then(() => {
 
   /* Additional security middleware - Path traversal protection */
   app.use(preventPathTraversal())
+
+  /* Block access to sensitive files */
+  app.use(blockSensitiveFiles())
 
   /* Additional security headers */
   app.use(additionalSecurityHeaders())

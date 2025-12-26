@@ -8,6 +8,8 @@ import * as otplib from 'otplib'
 export default defineConfig({
   projectId: '3hrkhu',
   defaultCommandTimeout: 10000,
+  video: false,
+  screenshotOnRunFailure: false,
   retries: {
     runMode: 2
   },

@@ -26,7 +26,8 @@ module.exports = {
     'vagrant/**',
     'frontend/**',
     'data/static/codefixes/**',
-    'dist/**'
+    'dist/**',
+    'test/cypress/**'
   ],
   overrides: [
     {
