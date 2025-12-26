@@ -18,7 +18,10 @@
       "Bash(node:*)",
       "Bash(git rm:*)",
       "Bash(mkdir:*)",
-      "Bash(timeout 15 node:*)"
+      "Bash(timeout 15 node:*)",
+      "Bash(xxd:*)",
+      "Bash(openssl genrsa:*)",
+      "Bash(openssl rsa:*)"
     ]
   }
 }

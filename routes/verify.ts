@@ -113,13 +113,37 @@ function jwtChallenge (challenge: Challenge, req: Request, algorithm: string, em
       return
     }
 
-    jwt.verify(token, security.publicKey, (err: jwt.VerifyErrors | null) => {
-      if (err === null) {
+    // Intentionally vulnerable: Accept tokens with 'none' algorithm or HS256 signed with public key
+    const header = JSON.parse(Buffer.from(token.split('.')[0], 'base64').toString())
+
+    if (header.alg === 'none') {
+      // Unsigned token vulnerability (CVE-2015-9235)
+      challengeUtils.solveIf(challenge, () => {
+        return hasAlgorithm(token, algorithm) && hasEmail(decoded as { data: { email: string } }, email)
+      })
+    } else if (header.alg === 'HS256') {
+      // Algorithm confusion vulnerability (CVE-2016-10555)
+      // Manually verify HMAC-SHA256 signature using public key as secret
+      const crypto = require('crypto')
+      const parts = token.split('.')
+      const signatureInput = parts[0] + '.' + parts[1]
+      const signature = Buffer.from(parts[2].replace(/-/g, '+').replace(/_/g, '/'), 'base64')
+      const expectedSignature = crypto.createHmac('sha256', security.publicKey).update(signatureInput).digest()
+
+      if (crypto.timingSafeEqual(signature, expectedSignature)) {
         challengeUtils.solveIf(challenge, () => {
           return hasAlgorithm(token, algorithm) && hasEmail(decoded as { data: { email: string } }, email)
         })
       }
-    })
+    } else {
+      jwt.verify(token, security.publicKey, (err: jwt.VerifyErrors | null) => {
+        if (err === null) {
+          challengeUtils.solveIf(challenge, () => {
+            return hasAlgorithm(token, algorithm) && hasEmail(decoded as { data: { email: string } }, email)
+          })
+        }
+      })
+    }
   }
 }
 

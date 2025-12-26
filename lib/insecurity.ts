@@ -162,34 +162,11 @@ export const redirectAllowlist = new Set([
 ])
 
 export const isRedirectAllowed = (url: string) => {
-  if (!url) return false
-
-  try {
-    const parsedUrl = new URL(url)
-
-    // Strict validation: check exact match of protocol + host + pathname
-    for (const allowedUrl of redirectAllowlist) {
-      try {
-        const parsedAllowed = new URL(allowedUrl)
-
-        // Protocol and host must match exactly
-        if (parsedUrl.protocol === parsedAllowed.protocol &&
-            parsedUrl.host === parsedAllowed.host) {
-          // Pathname must start with the allowed path
-          if (parsedUrl.pathname === parsedAllowed.pathname ||
-              parsedUrl.pathname.startsWith(parsedAllowed.pathname + '/')) {
-            return true
-          }
-        }
-      } catch {
-        continue
-      }
-    }
-    return false
-  } catch {
-    // Invalid URL format
-    return false
+  let allowed = false
+  for (const allowedUrl of redirectAllowlist) {
+    allowed = allowed || url.includes(allowedUrl)
   }
+  return allowed
 }
 // vuln-code-snippet end redirectCryptoCurrencyChallenge redirectChallenge
 

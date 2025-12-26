@@ -7,7 +7,7 @@ import fs from 'node:fs'
 import chai from 'chai'
 import path from 'node:path'
 import { promisify } from 'util'
-import { safeLoad } from 'js-yaml'
+import { load } from 'js-yaml'
 import sinonChai from 'sinon-chai'
 const expect = chai.expect
 chai.use(sinonChai)
@@ -16,7 +16,7 @@ const readFile = promisify(fs.readFile)
 
 const loadYamlFile = async (filename: string) => {
   const contents = await readFile(filename, { encoding: 'utf8' })
-  return safeLoad(contents)
+  return load(contents)
 }
 
 describe('challengeCountryMapping', () => {
@@ -24,7 +24,7 @@ describe('challengeCountryMapping', () => {
   let countryMapping: Record<string, { code: any }>
   before(async () => {
     challenges = await loadYamlFile(path.resolve('data/static/challenges.yml'))
-    countryMapping = (await loadYamlFile(path.resolve('config/fbctf.yml')) as any)?.ctf?.countryMapping
+    countryMapping = (await loadYamlFile(path.resolve('config/fbctf.yml')))?.ctf?.countryMapping
   })
   it('should have a country mapping for every challenge', async () => {
     for (const { key } of challenges) {
