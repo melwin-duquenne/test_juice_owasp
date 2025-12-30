@@ -188,85 +188,85 @@ jobs:
             NODE_ENV=quiet npm run test:server &&
             NODE_ENV=tutorial npm run test:server &&
             NODE_ENV=unsafe npm run test:server
-  # e2e: # Disabled for fork
-  #   runs-on: ${{ matrix.os }}
-  #   strategy:
-  #     matrix:
-  #       os: [ubuntu-latest, macos-latest]
-  #       browser: [chrome]
-  #     fail-fast: false
-  #   steps:
-  #     - name: "Check out Git repository"
-  #       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #v4.2.2
-  #     - name: "Use Node.js 22"
-  #       uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af #v4.1.0
-  #       with:
-  #         node-version: ${{ env.NODE_DEFAULT_VERSION }}
-  #     - name: "Install CLI tools"
-  #       run: npm install -g @angular/cli
-  #     - name: "Install application"
-  #       run: npm install
-  #     - name: "Execute end-to-end tests on Ubuntu"
-  #       if: ${{ matrix.os == 'ubuntu-latest' }}
-  #       uses: cypress-io/github-action@57b70560982e6a11d23d4b8bec7f8a487cdbb71b #v6.7.8
-  #       with:
-  #         install: false
-  #         browser: ${{ matrix.browser }}
-  #         start: npm start
-  #         wait-on: http://localhost:3000
-  #         record: true
-  #         group: ${{ matrix.browser }} @ ${{ matrix.os }}
-  #       env:
-  #         SOLUTIONS_WEBHOOK: ${{ secrets.E2E_SOLUTIONS_WEBHOOK }}
-  #         CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #     - name: "Execute end-to-end tests on Mac"
-  #       if: ${{ matrix.os == 'macos-latest' }}
-  #       uses: cypress-io/github-action@57b70560982e6a11d23d4b8bec7f8a487cdbb71b #v6.7.8
-  #       with:
-  #         install: false
-  #         browser: ${{ matrix.browser }}
-  #         start: npm start
-  #         wait-on: http://localhost:3000
-  #         record: true
-  #         group: ${{ matrix.browser }} @ ${{ matrix.os }}
-  #       env:
-  #         CYPRESS_CACHE_FOLDER: /Users/runner/Library/Caches/Cypress
-  #         CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  # smoke-test: # Disabled for fork
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: "Check out Git repository"
-  #       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #v4.2.2
-  #     - name: "Use Node.js 22"
-  #       uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af #v4.1.0
-  #       with:
-  #         node-version: ${{ env.NODE_DEFAULT_VERSION }}
-  #     - name: "Install CLI tools"
-  #       run: |
-  #         npm install -g @cyclonedx/cyclonedx-npm@$CYCLONEDX_NPM_VERSION
-  #         npm install -g grunt-cli
-  #     - name: "Set packaging options for Grunt"
-  #       run: |
-  #         echo "PCKG_OS_NAME=linux" >> $GITHUB_ENV
-  #         echo "PCKG_NODE_VERSION=18" >> $GITHUB_ENV
-  #         echo "PCKG_CPU_ARCH=x64" >> $GITHUB_ENV
-  #     - name: "Package application"
-  #       run: |
-  #         npm install --production
-  #         npm run package:ci
-  #     - name: "Unpack application archive"
-  #       run: |
-  #         cd dist
-  #         tar -zxf juice-shop-*.tgz
-  #     - name: "Execute smoke test"
-  #       run: |
-  #         cd dist/juice-shop_*
-  #         npm start &
-  #         cd ../..
-  #         chmod +x test/smoke/smoke-test.sh
-  #         test/smoke/smoke-test.sh http://localhost:3000
+  e2e:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        browser: [chrome]
+      fail-fast: false
+    steps:
+      - name: "Check out Git repository"
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #v4.2.2
+      - name: "Use Node.js 22"
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af #v4.1.0
+        with:
+          node-version: ${{ env.NODE_DEFAULT_VERSION }}
+      - name: "Install CLI tools"
+        run: npm install -g @angular/cli
+      - name: "Install application"
+        run: npm install
+      - name: "Execute end-to-end tests on Ubuntu"
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        uses: cypress-io/github-action@57b70560982e6a11d23d4b8bec7f8a487cdbb71b #v6.7.8
+        with:
+          install: false
+          browser: ${{ matrix.browser }}
+          start: npm start
+          wait-on: http://localhost:3000
+          record: true
+          group: ${{ matrix.browser }} @ ${{ matrix.os }}
+        env:
+          SOLUTIONS_WEBHOOK: ${{ secrets.E2E_SOLUTIONS_WEBHOOK }}
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: "Execute end-to-end tests on Mac"
+        if: ${{ matrix.os == 'macos-latest' }}
+        uses: cypress-io/github-action@57b70560982e6a11d23d4b8bec7f8a487cdbb71b #v6.7.8
+        with:
+          install: false
+          browser: ${{ matrix.browser }}
+          start: npm start
+          wait-on: http://localhost:3000
+          record: true
+          group: ${{ matrix.browser }} @ ${{ matrix.os }}
+        env:
+          CYPRESS_CACHE_FOLDER: /Users/runner/Library/Caches/Cypress
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Check out Git repository"
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #v4.2.2
+      - name: "Use Node.js 22"
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af #v4.1.0
+        with:
+          node-version: ${{ env.NODE_DEFAULT_VERSION }}
+      - name: "Install CLI tools"
+        run: |
+          npm install -g @cyclonedx/cyclonedx-npm@$CYCLONEDX_NPM_VERSION
+          npm install -g grunt-cli
+      - name: "Set packaging options for Grunt"
+        run: |
+          echo "PCKG_OS_NAME=linux" >> $GITHUB_ENV
+          echo "PCKG_NODE_VERSION=18" >> $GITHUB_ENV
+          echo "PCKG_CPU_ARCH=x64" >> $GITHUB_ENV
+      - name: "Package application"
+        run: |
+          npm install --production
+          npm run package:ci
+      - name: "Unpack application archive"
+        run: |
+          cd dist
+          tar -zxf juice-shop-*.tgz
+      - name: "Execute smoke test"
+        run: |
+          cd dist/juice-shop_*
+          npm start &
+          cd ../..
+          chmod +x test/smoke/smoke-test.sh
+          test/smoke/smoke-test.sh http://localhost:3000
   docker-test:
     runs-on: ubuntu-latest
     steps:
