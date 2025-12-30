@@ -953,3 +953,78 @@ Pour une sécurité maximale en production, il faudrait :
 3. Modifier la configuration Angular pour externaliser tous les styles
 
 ---
+
+## Protection contre les attaques DoS (Rate Limiting)
+
+### Problème identifié
+
+L'application crashait lors des tests ZAP avec une erreur "JavaScript heap out of memory" due à :
+1. Trop de requêtes simultanées non limitées
+2. Création d'objets Error pour chaque requête rejetée, causant des fuites mémoire
+
+### Corrections appliquées
+
+#### 1. Rate Limiting Global (server.ts:181-194)
+
+```typescript
+const globalRateLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 300, // 300 requêtes par minute par IP
+  message: { error: 'Too many requests, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.path.startsWith('/assets/') // Skip pour les assets statiques
+})
+app.use(globalRateLimiter)
+```
+
+#### 2. Rate Limiting Strict pour endpoints sensibles (server.ts:196-207)
+
+```typescript
+const strictRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 requêtes par 15 minutes par IP
+  message: { error: 'Too many attempts, please try again later.' }
+})
+app.use('/rest/user/login', strictRateLimiter)
+app.use('/rest/user/whoami', strictRateLimiter)
+app.use('/api/Users', strictRateLimiter)
+```
+
+#### 3. Rate Limiting pour accès fichiers (server.ts:317-325)
+
+```typescript
+const fileAccessRateLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 50, // 50 requêtes fichiers par minute par IP
+  message: { error: 'Too many file requests, please try again later.' }
+})
+app.use('/ftp', fileAccessRateLimiter, ...)
+```
+
+#### 4. Optimisation gestion d'erreurs (routes/fileServer.ts)
+
+**Problème** : Chaque requête invalide créait un objet `Error` via `next(new Error(...))`, causant une accumulation en mémoire.
+
+**Solution** : Retourner directement une réponse JSON au lieu de créer des objets Error :
+
+```typescript
+// AVANT - Fuite mémoire
+res.status(403)
+next(new Error('Only .md and .pdf files are allowed!'))
+
+// APRÈS - Pas de fuite mémoire
+res.status(403).json({ error: 'Only .md and .pdf files are allowed!' })
+```
+
+### Tableau récapitulatif Rate Limiting
+
+| Endpoint | Limite | Fenêtre | Protection |
+|----------|--------|---------|------------|
+| Global (toutes routes) | 300 req | 1 min | DoS général |
+| `/rest/user/login` | 10 req | 15 min | Brute force |
+| `/rest/user/whoami` | 10 req | 15 min | Enumération |
+| `/api/Users` | 10 req | 15 min | Création comptes |
+| `/ftp/*` | 50 req | 1 min | Scan fichiers |
+
+---

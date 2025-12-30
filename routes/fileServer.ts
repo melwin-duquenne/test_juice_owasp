@@ -12,14 +12,14 @@ import { challenges } from '../data/datacache'
 import * as challengeUtils from '../lib/challengeUtils'
 
 export function servePublicFiles () {
-  return ({ params, query }: Request, res: Response, next: NextFunction) => {
+  return ({ params }: Request, res: Response, next: NextFunction) => {
     const file = params.file
 
     if (!file.includes('/')) {
       verify(file, res, next)
     } else {
-      res.status(403)
-      next(new Error('File names cannot contain forward slashes!'))
+      // Return error response directly instead of creating Error object
+      res.status(403).json({ error: 'File names cannot contain forward slashes!' })
     }
   }
 
@@ -32,8 +32,8 @@ export function servePublicFiles () {
 
       res.sendFile(path.resolve('ftp/', file))
     } else {
-      res.status(403)
-      next(new Error('Only .md and .pdf files are allowed!'))
+      // Return error response directly instead of creating Error object to prevent memory leaks
+      res.status(403).json({ error: 'Only .md and .pdf files are allowed!' })
     }
   }
 

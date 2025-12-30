@@ -178,6 +178,34 @@ restoreOverwrittenFilesWithOriginals().then(() => {
   /* Compression for all requests */
   app.use(compression())
 
+  /* Global Rate Limiting - Protection against DoS attacks */
+  const globalRateLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute window
+    max: 300, // limit each IP to 300 requests per minute
+    message: { error: 'Too many requests, please try again later.' },
+    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    skip: (req: Request) => {
+      // Skip rate limiting for static assets to not break the UI
+      return req.path.startsWith('/assets/') || req.path.startsWith('/runtime.') || req.path.startsWith('/main.') || req.path.startsWith('/vendor.')
+    },
+    validate: false
+  })
+  app.use(globalRateLimiter)
+
+  /* Stricter rate limit for sensitive endpoints */
+  const strictRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // limit each IP to 10 requests per 15 minutes
+    message: { error: 'Too many attempts, please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: false
+  })
+  app.use('/rest/user/login', strictRateLimiter)
+  app.use('/rest/user/whoami', strictRateLimiter)
+  app.use('/api/Users', strictRateLimiter)
+
   /* CORS Configuration - Restrict to same origin */
   const corsOptions = {
     origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
@@ -286,10 +314,20 @@ restoreOverwrittenFilesWithOriginals().then(() => {
   }
 
   // vuln-code-snippet start directoryListingChallenge accessLogDisclosureChallenge
+  /* Rate limit for file access endpoints */
+  const fileAccessRateLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 50, // limit each IP to 50 file requests per minute
+    message: { error: 'Too many file requests, please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: false
+  })
+
   /* /ftp directory browsing and file download */ // vuln-code-snippet neutral-line directoryListingChallenge
-  app.use('/ftp', serveIndexMiddleware, serveIndex('ftp', { icons: true })) // vuln-code-snippet vuln-line directoryListingChallenge
-  app.use('/ftp(?!/quarantine)/:file', servePublicFiles()) // vuln-code-snippet vuln-line directoryListingChallenge
-  app.use('/ftp/quarantine/:file', serveQuarantineFiles()) // vuln-code-snippet neutral-line directoryListingChallenge
+  app.use('/ftp', fileAccessRateLimiter, serveIndexMiddleware, serveIndex('ftp', { icons: true })) // vuln-code-snippet vuln-line directoryListingChallenge
+  app.use('/ftp(?!/quarantine)/:file', fileAccessRateLimiter, servePublicFiles()) // vuln-code-snippet vuln-line directoryListingChallenge
+  app.use('/ftp/quarantine/:file', fileAccessRateLimiter, serveQuarantineFiles()) // vuln-code-snippet neutral-line directoryListingChallenge
 
   app.use('/.well-known', serveIndexMiddleware, serveIndex('.well-known', { icons: true, view: 'details' }))
   app.use('/.well-known', express.static('.well-known'))
