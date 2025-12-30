@@ -21,7 +21,8 @@
       "Bash(timeout 15 node:*)",
       "Bash(xxd:*)",
       "Bash(openssl genrsa:*)",
-      "Bash(openssl rsa:*)"
+      "Bash(openssl rsa:*)",
+      "Bash(git ls-tree:*)"
     ]
   }
 }
