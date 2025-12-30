@@ -223,8 +223,8 @@ restoreOverwrittenFilesWithOriginals().then(() => {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"], // unsafe-inline needed for cookie consent inline script
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'], // unsafe-inline needed for Angular Material
+        scriptSrc: ["'self'"], // No unsafe-inline - cookie consent script externalized
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'], // unsafe-inline required for Angular Material
         imgSrc: ["'self'", 'data:', 'https://gravatar.com', 'https://www.gravatar.com', 'https://i.imgur.com'],
         fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
         connectSrc: ["'self'", wsUrl], // WebSocket restricted to same origin

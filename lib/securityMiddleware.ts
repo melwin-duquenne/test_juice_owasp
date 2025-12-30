@@ -134,11 +134,11 @@ export const additionalSecurityHeaders = () => {
     // Content Security Policy - Secure configuration
     res.setHeader('Content-Security-Policy',
       "default-src 'self'; " +
-      "script-src 'self' 'unsafe-inline'; " + // unsafe-inline needed for cookie consent
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+      "script-src 'self'; " + // No unsafe-inline - cookie consent script externalized
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " + // unsafe-inline required for Angular Material
       "img-src 'self' data: https://gravatar.com https://www.gravatar.com https://i.imgur.com; " +
       "font-src 'self' data: https://fonts.gstatic.com; " +
-      "connect-src 'self' wss: ws:; " +
+      "connect-src 'self'; " +
       "base-uri 'self'; " +
       "form-action 'self'; " +
       "frame-ancestors 'none';"
