@@ -313,7 +313,8 @@ restoreOverwrittenFilesWithOriginals().then(() => {
     const origEnd = res.end
     // @ts-expect-error FIXME assignment broken due to seemingly void return value
     res.end = function () {
-      if (arguments.length) {
+      // Only process string content (HTML from serve-index), skip JSON/Buffer responses
+      if (arguments.length && typeof arguments[0] === 'string') {
         const reqPath = req.originalUrl.replace(/\?.*$/, '')
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const currentFolder = reqPath.split('/').pop()!
