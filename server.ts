@@ -217,6 +217,8 @@ restoreOverwrittenFilesWithOriginals().then(() => {
   app.use(cors(corsOptions))
 
   /* Security Policy - Content Security Policy */
+  const serverUrl = process.env.SERVER_URL ?? 'http://localhost:3000'
+  const wsUrl = serverUrl.replace(/^http/, 'ws')
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {
@@ -225,7 +227,7 @@ restoreOverwrittenFilesWithOriginals().then(() => {
         styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'], // unsafe-inline needed for Angular Material
         imgSrc: ["'self'", 'data:', 'https://gravatar.com', 'https://www.gravatar.com', 'https://i.imgur.com'],
         fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
-        connectSrc: ["'self'", 'wss:', 'ws:'], // WebSocket for live updates
+        connectSrc: ["'self'", wsUrl], // WebSocket restricted to same origin
         frameSrc: ["'self'"],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
@@ -255,7 +257,7 @@ restoreOverwrittenFilesWithOriginals().then(() => {
 
   /* Block cloud metadata requests (SSRF protection) */
   app.use((req: Request, res: Response, next: NextFunction) => {
-    const blockedPatterns = [
+    const blockedIpPatterns = [
       /169\.254\.169\.254/, // AWS metadata
       /metadata\.google\.internal/, // GCP metadata
       /169\.254\.170\.2/, // AWS ECS metadata
@@ -265,13 +267,33 @@ restoreOverwrittenFilesWithOriginals().then(() => {
       /100\.100\.100\.200/ // Alibaba Cloud metadata
     ]
 
+    const blockedPathPatterns = [
+      /^\/latest\/meta-data/i, // AWS metadata path
+      /^\/latest\/user-data/i, // AWS user-data path
+      /^\/latest\/dynamic/i, // AWS dynamic path
+      /^\/computeMetadata/i, // GCP metadata path
+      /^\/metadata/i, // Generic metadata path
+      /^\/instance\/computeMetadata/i // GCP alt path
+    ]
+
     const urlToCheck = req.url + (req.headers.host ?? '')
-    for (const pattern of blockedPatterns) {
+
+    // Check IP-based patterns
+    for (const pattern of blockedIpPatterns) {
       if (pattern.test(urlToCheck)) {
         res.status(403).json({ error: 'Access to cloud metadata is blocked' })
         return
       }
     }
+
+    // Check path-based patterns
+    for (const pattern of blockedPathPatterns) {
+      if (pattern.test(req.path)) {
+        res.status(403).json({ error: 'Access to cloud metadata is blocked' })
+        return
+      }
+    }
+
     next()
   })
 
@@ -294,6 +316,11 @@ restoreOverwrittenFilesWithOriginals().then(() => {
 
   /* robots.txt */
   app.use(robots({ UserAgent: '*', Disallow: '/ftp' }))
+
+  /* Block sensitive files that shouldn't be accessible */
+  app.use(['/sitemap.xml', '/sitemap.xml.gz', '/.htaccess', '/web.config'], (req: Request, res: Response) => {
+    res.status(404).json({ error: 'Not found' })
+  })
 
   /* Check for any URLs having been called that would be expected for challenge solving without cheating */
   app.use(antiCheat.checkForPreSolveInteractions())
