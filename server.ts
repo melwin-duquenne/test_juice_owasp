@@ -52,7 +52,8 @@ import logger from './lib/logger'
 import * as utils from './lib/utils'
 import * as antiCheat from './lib/antiCheat'
 import * as security from './lib/insecurity'
-import { preventPathTraversal, additionalSecurityHeaders, sanitizeRequestBody, secureIpFilter, blockSensitiveFiles } from './lib/securityMiddleware'
+// Security middlewares removed - Juice Shop is intentionally vulnerable for educational purposes
+// import { preventPathTraversal, additionalSecurityHeaders, sanitizeRequestBody, secureIpFilter, blockSensitiveFiles } from './lib/securityMiddleware'
 import validateConfig from './lib/startup/validateConfig'
 import cleanupFtpFolder from './lib/startup/cleanupFtpFolder'
 import customizeEasterEgg from './lib/startup/customizeEasterEgg' // vuln-code-snippet hide-line
@@ -181,25 +182,11 @@ restoreOverwrittenFilesWithOriginals().then(() => {
   app.options('*', cors())
   app.use(cors())
 
-  /* Security middleware */
-  app.use(helmet({
-    contentSecurityPolicy: false, // Géré par additionalSecurityHeaders
-    crossOriginEmbedderPolicy: false, // Désactivé pour compatibilité
-    crossOriginResourcePolicy: { policy: 'cross-origin' }
-  }))
+  /* Security Policy */
+  app.use(helmet.noSniff())
+  app.use(helmet.frameguard()) // Intentionally using default 'SAMEORIGIN' for Juice Shop
+  // Note: No X-XSS-Protection header - intentionally vulnerable
   app.disable('x-powered-by')
-
-  /* Additional security middleware - Path traversal protection */
-  app.use(preventPathTraversal())
-
-  /* Block access to sensitive files */
-  app.use(blockSensitiveFiles())
-
-  /* Additional security headers */
-  app.use(additionalSecurityHeaders())
-
-  /* Request body sanitization (logging only) */
-  app.use(sanitizeRequestBody())
 
   /* Hiring header */
   app.use((req: Request, res: Response, next: NextFunction) => {
@@ -435,7 +422,7 @@ restoreOverwrittenFilesWithOriginals().then(() => {
   /* Accounting users are allowed to check and update quantities */
   app.delete('/api/Quantitys/:id', security.denyAll())
   app.post('/api/Quantitys', security.denyAll())
-  app.use('/api/Quantitys/:id', security.isAccounting(), secureIpFilter(['123.456.789'], { mode: 'allow' }))
+  app.use('/api/Quantitys/:id', security.isAccounting())
   /* Feedbacks: Do not allow changes of existing feedback */
   app.put('/api/Feedbacks/:id', security.denyAll())
   /* PrivacyRequests: Only allowed for authenticated users */
