@@ -131,14 +131,16 @@ export const additionalSecurityHeaders = () => {
     // Permissions policy (replaces feature-policy)
     res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()')
 
-    // Content Security Policy
+    // Content Security Policy - Secure configuration
     res.setHeader('Content-Security-Policy',
       "default-src 'self'; " +
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+      "script-src 'self' 'unsafe-inline'; " + // unsafe-inline needed for cookie consent
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-      "img-src 'self' data: https:; " +
+      "img-src 'self' data: https://gravatar.com https://www.gravatar.com https://i.imgur.com; " +
       "font-src 'self' data: https://fonts.gstatic.com; " +
       "connect-src 'self' wss: ws:; " +
+      "base-uri 'self'; " +
+      "form-action 'self'; " +
       "frame-ancestors 'none';"
     )
 

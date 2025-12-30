@@ -83,7 +83,12 @@ export function getUserProfile () {
     }
 
     try {
-      const CSP = `img-src 'self' ${user?.profileImage}; script-src 'self' 'unsafe-eval' https://code.getmdl.io http://ajax.googleapis.com`
+      // Secure CSP - removed 'unsafe-eval' and restricted img-src
+      const profileImageDomain = user?.profileImage ? new URL(user.profileImage, 'http://localhost').origin : ''
+      const allowedImgSrc = profileImageDomain && profileImageDomain !== 'http://localhost'
+        ? `'self' data: ${profileImageDomain}`
+        : "'self' data:"
+      const CSP = `default-src 'self'; img-src ${allowedImgSrc}; script-src 'self' https://code.getmdl.io https://ajax.googleapis.com; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'`
 
       challengeUtils.solveIf(challenges.usernameXssChallenge, () => {
         return username && user?.profileImage.match(/;[ ]*script-src(.)*'unsafe-inline'/g) !== null && utils.contains(username, '<script>alert(`xss`)</script>')

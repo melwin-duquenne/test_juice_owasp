@@ -902,18 +902,54 @@ app.use(helmet.frameguard({ action: 'deny' }))
 
 | Vulnérabilité ZAP | Correction | Fichier |
 |-------------------|------------|---------|
-| CSP: Wildcard Directive | CSP stricte avec defaultSrc: 'self' | server.ts:192-208 |
-| CSP: script-src unsafe-eval | scriptSrc: ['self'] uniquement | server.ts:196 |
-| CSP: script-src unsafe-inline | scriptSrc: ['self'] uniquement | server.ts:196 |
-| CSP: style-src unsafe-inline | Conservé pour Angular (styleSrc) | server.ts:197 |
+| CSP: Wildcard Directive | Suppression de `https:` wildcard, domaines explicites | server.ts:192-211 |
+| CSP: script-src unsafe-eval | Supprimé de userProfile.ts et securityMiddleware.ts | userProfile.ts:86-91, securityMiddleware.ts:137 |
+| CSP: script-src unsafe-inline | Conservé (nécessaire pour cookie consent inline) | server.ts:196 |
+| CSP: style-src unsafe-inline | Conservé pour Angular Material | server.ts:197 |
 | CORS Wildcard | Origine restreinte + options strictes | server.ts:181-189 |
 
-### Note sur style-src unsafe-inline
+### Corrections supplémentaires (v2)
 
-L'option `'unsafe-inline'` est conservée pour `styleSrc` car Angular Material et certains composants Angular injectent des styles dynamiquement. Cette vulnérabilité est de sévérité **faible** et nécessaire pour le bon fonctionnement de l'application.
+#### CSP img-src Wildcard corrigé
+
+**Problème** : `imgSrc: ['self', 'data:', 'https:']` permettait le chargement d'images depuis n'importe quel domaine HTTPS.
+
+**Solution** : Domaines explicitement autorisés uniquement :
+```typescript
+imgSrc: ["'self'", 'data:', 'https://gravatar.com', 'https://www.gravatar.com', 'https://i.imgur.com']
+```
+
+#### CSP userProfile.ts sécurisé
+
+**Problème** : La route `/profile` définissait une CSP vulnérable avec `'unsafe-eval'`.
+
+**Solution** : CSP stricte avec validation du domaine d'image de profil :
+```typescript
+const profileImageDomain = user?.profileImage ? new URL(user.profileImage, 'http://localhost').origin : ''
+const allowedImgSrc = profileImageDomain && profileImageDomain !== 'http://localhost'
+  ? `'self' data: ${profileImageDomain}`
+  : "'self' data:"
+const CSP = `default-src 'self'; img-src ${allowedImgSrc}; script-src 'self' https://code.getmdl.io https://ajax.googleapis.com; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'`
+```
+
+#### Directives CSP additionnelles
+
+Ajout de directives de sécurité supplémentaires :
+- `baseUri: ["'self'"]` - Empêche les attaques de base tag injection
+- `formAction: ["'self'"]` - Restreint les destinations de formulaires
+- `frameAncestors: ["'none'"]` - Protection contre le clickjacking
+
+### Note sur script-src et style-src unsafe-inline
+
+L'option `'unsafe-inline'` est conservée pour :
+- **scriptSrc** : Le script cookie consent dans `index.html` est inline
+- **styleSrc** : Angular Material injecte des styles dynamiquement
+
+Ces vulnérabilités sont de sévérité **faible** et nécessaires pour le bon fonctionnement de l'application.
 
 Pour une sécurité maximale en production, il faudrait :
-1. Utiliser des nonces ou hashes pour les styles inline
-2. Modifier la configuration Angular pour externaliser tous les styles
+1. Utiliser des nonces ou hashes pour les scripts/styles inline
+2. Externaliser le script cookie consent
+3. Modifier la configuration Angular pour externaliser tous les styles
 
 ---
