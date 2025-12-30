@@ -4,7 +4,6 @@
  */
 
 import * as frisby from 'frisby'
-import config from 'config'
 
 const URL = 'http://localhost:3000'
 
@@ -44,40 +43,26 @@ describe('/redirect', () => {
       .expect('status', 302)
   })
 
-  it('GET error message with information leakage when calling /redirect without query parameter', () => {
+  // Security: No information leakage when calling without proper parameters
+  it('GET 400 error without information leakage when calling /redirect without query parameter', () => {
     return frisby.get(`${URL}/redirect`)
-      .expect('status', 500)
-      .expect('header', 'content-type', /text\/html/)
-      .expect('bodyContains', `<h1>${config.get<string>('application.name')} (Express`)
-      .expect('bodyContains', 'TypeError')
-      .expect('bodyContains', 'of undefined')
-      .expect('bodyContains', '&#39;includes&#39;')
+      .expect('status', 400)
   })
 
-  it('GET error message with information leakage when calling /redirect with unrecognized query parameter', () => {
+  it('GET 400 error without information leakage when calling /redirect with unrecognized query parameter', () => {
     return frisby.get(`${URL}/redirect?x=y`)
-      .expect('status', 500)
-      .expect('header', 'content-type', /text\/html/)
-      .expect('bodyContains', `<h1>${config.get<string>('application.name')} (Express`)
-      .expect('bodyContains', 'TypeError')
-      .expect('bodyContains', 'of undefined')
-      .expect('bodyContains', '&#39;includes&#39;')
+      .expect('status', 400)
   })
 
-  it('GET error message hinting at allowlist validation when calling /redirect with an unrecognized "to" target', () => {
+  it('GET 400 error when calling /redirect with an unrecognized target URL', () => {
     return frisby.get(`${URL}/redirect?to=whatever`)
-      .expect('status', 406)
-      .expect('header', 'content-type', /text\/html/)
-      .expect('bodyContains', `<h1>${config.get<string>('application.name')} (Express`)
-      .expect('bodyContains', 'Unrecognized target URL for redirect: whatever')
+      .expect('status', 400)
   })
 
-  it('GET redirected to target URL in "to" parameter when a allow-listed URL is part of the query string', () => {
+  // Security: Open redirect bypass attempt is blocked
+  it('GET 400 when attempting open redirect bypass with query string trick', () => {
+    // This tests that the satisfyIndexOf bypass attempt is blocked
     return frisby.get(`${URL}/redirect?to=/score-board?satisfyIndexOf=https://github.com/juice-shop/juice-shop`)
-      .expect('status', 200)
-      .expect('header', 'content-type', /text\/html/)
-      .expect('bodyContains', 'main.js')
-      .expect('bodyContains', 'runtime.js')
-      .expect('bodyContains', 'polyfills.js')
+      .expect('status', 400)
   })
 })

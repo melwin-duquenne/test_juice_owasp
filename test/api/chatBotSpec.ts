@@ -277,7 +277,8 @@ describe('/chatbot', () => {
         .promise()
     })
 
-    it('Returns a 500 when the user name is set to crash request', async () => {
+    // Security: Malicious username should not crash the chatbot
+    it('Handles malicious username safely without crashing', async () => {
       await frisby.post(`${API_URL}/Users`, {
         headers: {
           'Content-Type': 'application/json'
@@ -307,8 +308,7 @@ describe('/chatbot', () => {
           query: testCommand
         }
       })
-        .inspectResponse()
-        .expect('status', 500)
+        .expect('status', 200)
         .promise()
     })
   })

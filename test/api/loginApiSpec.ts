@@ -48,12 +48,12 @@ describe('/rest/user/login', () => {
       .expect('status', 401)
   })
 
-  it('POST login without credentials', () => {
+  it('POST login without credentials returns 400', () => {
     return frisby.post(REST_URL + '/user/login', {
       email: undefined,
       password: undefined
     }, { json: true })
-      .expect('status', 401)
+      .expect('status', 400)
   })
 
   it('POST login with admin credentials', () => {
@@ -149,7 +149,8 @@ describe('/rest/user/login', () => {
       })
   })
 
-  it('POST login with WHERE-clause disabling SQL injection attack', () => {
+  // Security: SQL injection attacks should be blocked with 400 Bad Request
+  it('POST login with SQL injection attack is blocked', () => {
     return frisby.post(REST_URL + '/user/login', {
       header: jsonHeader,
       body: {
@@ -157,14 +158,10 @@ describe('/rest/user/login', () => {
         password: undefined
       }
     })
-      .expect('status', 200)
-      .expect('header', 'content-type', /application\/json/)
-      .expect('jsonTypes', 'authentication', {
-        token: Joi.string()
-      })
+      .expect('status', 400)
   })
 
-  it('POST login with known email "admin@juice-sh.op" in SQL injection attack', () => {
+  it('POST login with SQL injection on admin email is blocked', () => {
     return frisby.post(REST_URL + '/user/login', {
       header: jsonHeader,
       body: {
@@ -172,14 +169,10 @@ describe('/rest/user/login', () => {
         password: undefined
       }
     })
-      .expect('status', 200)
-      .expect('header', 'content-type', /application\/json/)
-      .expect('jsonTypes', 'authentication', {
-        token: Joi.string()
-      })
+      .expect('status', 400)
   })
 
-  it('POST login with known email "jim@juice-sh.op" in SQL injection attack', () => {
+  it('POST login with SQL injection on jim email is blocked', () => {
     return frisby.post(REST_URL + '/user/login', {
       header: jsonHeader,
       body: {
@@ -187,14 +180,10 @@ describe('/rest/user/login', () => {
         password: undefined
       }
     })
-      .expect('status', 200)
-      .expect('header', 'content-type', /application\/json/)
-      .expect('jsonTypes', 'authentication', {
-        token: Joi.string()
-      })
+      .expect('status', 400)
   })
 
-  it('POST login with known email "bender@juice-sh.op" in SQL injection attack', () => {
+  it('POST login with SQL injection on bender email is blocked', () => {
     return frisby.post(REST_URL + '/user/login', {
       header: jsonHeader,
       body: {
@@ -202,14 +191,10 @@ describe('/rest/user/login', () => {
         password: undefined
       }
     })
-      .expect('status', 200)
-      .expect('header', 'content-type', /application\/json/)
-      .expect('jsonTypes', 'authentication', {
-        token: Joi.string()
-      })
+      .expect('status', 400)
   })
 
-  it('POST login with non-existing email "acc0unt4nt@juice-sh.op" via UNION SELECT injection attack', () => {
+  it('POST login with UNION SELECT injection attack is blocked', () => {
     return frisby.post(REST_URL + '/user/login', {
       header: jsonHeader,
       body: {
@@ -217,14 +202,10 @@ describe('/rest/user/login', () => {
         password: undefined
       }
     })
-      .expect('status', 200)
-      .expect('header', 'content-type', /application\/json/)
-      .expect('jsonTypes', 'authentication', {
-        token: Joi.string()
-      })
+      .expect('status', 400)
   })
 
-  it('POST login with query-breaking SQL Injection attack', () => {
+  it('POST login with query-breaking SQL Injection attack is blocked', () => {
     return frisby.post(REST_URL + '/user/login', {
       header: jsonHeader,
       body: {
@@ -232,7 +213,7 @@ describe('/rest/user/login', () => {
         password: undefined
       }
     })
-      .expect('status', 401)
+      .expect('status', 400)
   })
 })
 

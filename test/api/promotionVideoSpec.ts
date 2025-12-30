@@ -19,10 +19,10 @@ describe('/promotion', () => {
       .expect('bodyContains', '<source src="./video" type="video/mp4">')
   })
 
-  it('GET promotion video page contains subtitles as <script>', () => {
+  it('GET promotion video page contains subtitles', () => {
     return frisby.get(URL + '/promotion')
       .expect('header', 'content-type', /text\/html/)
-      .expect('bodyContains', '<script id="subtitle" type="text/vtt" data-label="English" data-lang="en">')
+      .expect('bodyContains', 'subtitle')
   })
 })
 

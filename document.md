@@ -998,7 +998,7 @@ const fileAccessRateLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
   max: 50, // 50 requêtes fichiers par minute par IP
   message: { error: 'Too many file requests, please try again later.' }
-})
+})  
 app.use('/ftp', fileAccessRateLimiter, ...)
 ```
 

@@ -4,7 +4,6 @@
  */
 
 import * as frisby from 'frisby'
-const Joi = frisby.Joi
 
 const REST_URL = 'http://localhost:3000/rest'
 
@@ -15,23 +14,10 @@ describe('/rest/track-order/:id', () => {
       .expect('json', {})
   })
 
-  it('GET all orders by injecting into orderId', () => {
-    const product = Joi.object().keys({
-      quantity: Joi.number(),
-      name: Joi.string(),
-      price: Joi.number(),
-      total: Joi.number()
-    })
+  it('GET order by injection is blocked with 400 error', () => {
+    // NoSQL injection attempt: %27%20%7C%7C%20true%20%7C%7C%20%27 = ' || true || '
+    // Should be blocked by input validation
     return frisby.get(REST_URL + '/track-order/%27%20%7C%7C%20true%20%7C%7C%20%27')
-      .expect('status', 200)
-      .expect('header', 'content-type', /application\/json/)
-      .expect('jsonTypes', 'data.*', {
-        orderId: Joi.string(),
-        email: Joi.string(),
-        totalPrice: Joi.number(),
-        products: Joi.array().items(product),
-        eta: Joi.string(),
-        _id: Joi.string()
-      })
+      .expect('status', 400)
   })
 })

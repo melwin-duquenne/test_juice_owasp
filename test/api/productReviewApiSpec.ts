@@ -6,9 +6,7 @@
 import { type IncomingMessage } from 'node:http'
 import * as frisby from 'frisby'
 import http from 'node:http'
-import config from 'config'
 
-import { type Product } from '../../data/types'
 import * as security from '../../lib/insecurity'
 const Joi = frisby.Joi
 
@@ -34,15 +32,9 @@ describe('/rest/products/:id/reviews', () => {
       .expect('jsonTypes', reviewResponseSchema)
   })
 
-  it('GET product reviews attack by injecting a mongoDB sleep command', () => {
+  // Security: MongoDB injection attempts should be blocked
+  it('GET product reviews with invalid product id is blocked', () => {
     return frisby.get(`${REST_URL}/products/sleep(1)/reviews`)
-      .expect('status', 200)
-      .expect('header', 'content-type', /application\/json/)
-      .expect('jsonTypes', reviewResponseSchema)
-  })
-
-  xit('GET product reviews by alphanumeric non-mongoDB-command product id', () => { // FIXME Turn on when #1960 is resolved
-    return frisby.get(`${REST_URL}/products/kaboom/reviews`)
       .expect('status', 400)
   })
 
@@ -83,12 +75,12 @@ describe('/rest/products/reviews', () => {
     })
   })
 
-  it('PATCH single product review can be edited', () => {
+  it('PATCH single product review can be edited with valid id', () => {
     return frisby.patch(`${REST_URL}/products/reviews`, {
       headers: authHeader,
       body: {
         id: reviewId,
-        message: 'Lorem Ipsum'
+        message: 'Lorem Ipsum Updated'
       }
     })
       .expect('status', 200)
@@ -96,7 +88,7 @@ describe('/rest/products/reviews', () => {
       .expect('jsonTypes', updatedReviewResponseSchema)
   })
 
-  it('PATCH single product review editing need an authenticated user', () => {
+  it('PATCH single product review editing needs an authenticated user', () => {
     return frisby.patch(`${REST_URL}/products/reviews`, {
       body: {
         id: reviewId,
@@ -106,7 +98,7 @@ describe('/rest/products/reviews', () => {
       .expect('status', 401)
   })
 
-  it('POST non-existing product review cannot be liked', () => {
+  it('POST non-existing product review returns 400 for invalid id', () => {
     return frisby.post(`${REST_URL}/user/login`, {
       headers: jsonHeader,
       body: {
@@ -122,11 +114,11 @@ describe('/rest/products/reviews', () => {
             id: 'does not exist'
           }
         })
-          .expect('status', 404)
+          .expect('status', 400)
       })
   })
 
-  it('POST single product review can be liked', () => {
+  it('POST single product review can be liked with valid id', () => {
     return frisby.post(`${REST_URL}/user/login`, {
       headers: jsonHeader,
       body: {
@@ -147,20 +139,15 @@ describe('/rest/products/reviews', () => {
       })
   })
 
-  it('PATCH multiple product review via injection', () => {
-    // Count all the reviews. (Count starts at one because of the review inserted by the other tests...)
-    const totalReviews = config.get<Product[]>('products').reduce((sum: number, { reviews = [] }: any) => sum + reviews.length, 1)
-
+  // Security: NoSQL injection via $ne operator should be blocked
+  it('PATCH with NoSQL injection operator is blocked', () => {
     return frisby.patch(`${REST_URL}/products/reviews`, {
       headers: authHeader,
       body: {
         id: { $ne: -1 },
-        message: 'trololololololololololololololololololololololololololol'
+        message: 'injection attempt'
       }
     })
-      .expect('status', 200)
-      .expect('header', 'content-type', /application\/json/)
-      .expect('jsonTypes', updatedReviewResponseSchema)
-      .expect('json', { modified: totalReviews })
+      .expect('status', 400)
   })
 })

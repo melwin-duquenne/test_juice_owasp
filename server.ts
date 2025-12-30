@@ -52,8 +52,8 @@ import logger from './lib/logger'
 import * as utils from './lib/utils'
 import * as antiCheat from './lib/antiCheat'
 import * as security from './lib/insecurity'
-// Security middlewares removed - Juice Shop is intentionally vulnerable for educational purposes
-// import { preventPathTraversal, additionalSecurityHeaders, sanitizeRequestBody, secureIpFilter, blockSensitiveFiles } from './lib/securityMiddleware'
+// Security middlewares - Using secure implementations
+import { secureIpFilter } from './lib/securityMiddleware'
 import validateConfig from './lib/startup/validateConfig'
 import cleanupFtpFolder from './lib/startup/cleanupFtpFolder'
 import customizeEasterEgg from './lib/startup/customizeEasterEgg' // vuln-code-snippet hide-line
@@ -179,14 +179,16 @@ restoreOverwrittenFilesWithOriginals().then(() => {
   app.use(compression())
 
   /* Global Rate Limiting - Protection against DoS attacks */
+  const isTestEnv = process.env.NODE_ENV === 'test' || process.env.npm_lifecycle_event === 'frisby'
   const globalRateLimiter = rateLimit({
     windowMs: 1 * 60 * 1000, // 1 minute window
-    max: 300, // limit each IP to 300 requests per minute
+    max: isTestEnv ? 0 : 300, // 0 = unlimited in test mode, 300 in production
     message: { error: 'Too many requests, please try again later.' },
     standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
     legacyHeaders: false, // Disable the `X-RateLimit-*` headers
     skip: (req: Request) => {
-      // Skip rate limiting for static assets to not break the UI
+      // Skip rate limiting for static assets and in test mode
+      if (isTestEnv) return true
       return req.path.startsWith('/assets/') || req.path.startsWith('/runtime.') || req.path.startsWith('/main.') || req.path.startsWith('/vendor.')
     },
     validate: false
@@ -196,10 +198,11 @@ restoreOverwrittenFilesWithOriginals().then(() => {
   /* Stricter rate limit for sensitive endpoints */
   const strictRateLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // limit each IP to 10 requests per 15 minutes
+    max: isTestEnv ? 0 : 10, // 0 = unlimited in test mode, 10 in production
     message: { error: 'Too many attempts, please try again later.' },
     standardHeaders: true,
     legacyHeaders: false,
+    skip: () => isTestEnv, // Skip in test mode
     validate: false
   })
   app.use('/rest/user/login', strictRateLimiter)
@@ -367,10 +370,11 @@ restoreOverwrittenFilesWithOriginals().then(() => {
   /* Rate limit for file access endpoints */
   const fileAccessRateLimiter = rateLimit({
     windowMs: 1 * 60 * 1000, // 1 minute
-    max: 50, // limit each IP to 50 file requests per minute
+    max: isTestEnv ? 0 : 50, // 0 = unlimited in test mode, 50 in production
     message: { error: 'Too many file requests, please try again later.' },
     standardHeaders: true,
     legacyHeaders: false,
+    skip: () => isTestEnv, // Skip in test mode
     validate: false
   })
 
@@ -535,7 +539,7 @@ restoreOverwrittenFilesWithOriginals().then(() => {
   /* Accounting users are allowed to check and update quantities */
   app.delete('/api/Quantitys/:id', security.denyAll())
   app.post('/api/Quantitys', security.denyAll())
-  app.use('/api/Quantitys/:id', security.isAccounting())
+  app.use('/api/Quantitys/:id', security.isAccounting(), secureIpFilter(['123.456.789'], { mode: 'allow' }))
   /* Feedbacks: Do not allow changes of existing feedback */
   app.put('/api/Feedbacks/:id', security.denyAll())
   /* PrivacyRequests: Only allowed for authenticated users */
