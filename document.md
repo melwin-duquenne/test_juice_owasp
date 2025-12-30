@@ -787,3 +787,133 @@ export const ordersCollection = new SecureCollection<Order>('orders')
    ```
 
 ---
+
+## Analyse OWASP ZAP - Vulnérabilités détectées et corrections
+
+### Vulnérabilités identifiées par ZAP
+
+L'analyse de sécurité avec OWASP ZAP a révélé les vulnérabilités suivantes :
+
+| Vulnérabilité | Sévérité | Endpoints affectés |
+|---------------|----------|-------------------|
+| CSP: Wildcard Directive | Moyenne | Tous les endpoints (8+) |
+| CSP: script-src unsafe-eval | Moyenne | Tous les endpoints (8+) |
+| CSP: script-src unsafe-inline | Moyenne | Tous les endpoints (8+) |
+| CSP: style-src unsafe-inline | Faible | Tous les endpoints (8+) |
+| Mauvaise configuration CORS | Moyenne | 31 endpoints dont /ftp/*, /assets/*, etc. |
+
+### Détail des vulnérabilités
+
+#### 1. Content-Security-Policy (CSP) - Wildcard et unsafe-*
+
+**Problème** : L'application n'avait pas de CSP configurée, permettant :
+- L'exécution de scripts depuis n'importe quelle source
+- L'utilisation de `eval()` et `Function()` (unsafe-eval)
+- L'exécution de scripts inline (unsafe-inline)
+- Les styles inline sans restriction
+
+**Risques** :
+- Attaques XSS (Cross-Site Scripting)
+- Injection de code malveillant
+- Exfiltration de données
+
+#### 2. Mauvaise configuration CORS (Cross-Origin Resource Sharing)
+
+**Problème** : L'application utilisait `cors()` sans configuration, ce qui équivaut à :
+```
+Access-Control-Allow-Origin: *
+```
+
+**Risques** :
+- Accès aux ressources depuis n'importe quel domaine
+- Attaques CSRF facilitées
+- Fuite de données sensibles vers des domaines tiers
+
+### Corrections appliquées dans server.ts
+
+#### Configuration CORS sécurisée
+
+```typescript
+// AVANT - Vulnérable
+app.options('*', cors())
+app.use(cors())
+
+// APRÈS - Sécurisé
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true
+}
+app.options('*', cors(corsOptions))
+app.use(cors(corsOptions))
+```
+
+**Améliorations** :
+- Origine restreinte à l'application elle-même
+- Méthodes HTTP explicitement autorisées
+- Headers autorisés limités
+- Support des credentials pour l'authentification
+
+#### Configuration CSP stricte avec Helmet
+
+```typescript
+// AVANT - Pas de CSP
+app.use(helmet.noSniff())
+app.use(helmet.frameguard())
+
+// APRÈS - CSP complète
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"], // Nécessaire pour Angular
+      imgSrc: ["'self'", 'data:', 'https:'],
+      fontSrc: ["'self'", 'data:'],
+      connectSrc: ["'self'"],
+      frameSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: []
+    }
+  },
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: 'same-origin' }
+}))
+app.use(helmet.noSniff())
+app.use(helmet.frameguard({ action: 'deny' }))
+```
+
+**Directives CSP expliquées** :
+
+| Directive | Valeur | Description |
+|-----------|--------|-------------|
+| `defaultSrc` | 'self' | Par défaut, seules les ressources du même domaine sont autorisées |
+| `scriptSrc` | 'self' | Scripts uniquement depuis le même domaine (bloque unsafe-eval/inline) |
+| `styleSrc` | 'self', 'unsafe-inline' | Styles du même domaine + inline (requis par Angular) |
+| `imgSrc` | 'self', 'data:', 'https:' | Images locales, data URIs et HTTPS |
+| `fontSrc` | 'self', 'data:' | Polices locales et data URIs |
+| `connectSrc` | 'self' | Connexions XHR/fetch uniquement vers le même domaine |
+| `frameSrc` | 'self' | Iframes uniquement du même domaine |
+| `objectSrc` | 'none' | Bloque les plugins (Flash, Java, etc.) |
+| `upgradeInsecureRequests` | [] | Force HTTPS pour les ressources HTTP |
+
+### Tableau récapitulatif des corrections ZAP
+
+| Vulnérabilité ZAP | Correction | Fichier |
+|-------------------|------------|---------|
+| CSP: Wildcard Directive | CSP stricte avec defaultSrc: 'self' | server.ts:192-208 |
+| CSP: script-src unsafe-eval | scriptSrc: ['self'] uniquement | server.ts:196 |
+| CSP: script-src unsafe-inline | scriptSrc: ['self'] uniquement | server.ts:196 |
+| CSP: style-src unsafe-inline | Conservé pour Angular (styleSrc) | server.ts:197 |
+| CORS Wildcard | Origine restreinte + options strictes | server.ts:181-189 |
+
+### Note sur style-src unsafe-inline
+
+L'option `'unsafe-inline'` est conservée pour `styleSrc` car Angular Material et certains composants Angular injectent des styles dynamiquement. Cette vulnérabilité est de sévérité **faible** et nécessaire pour le bon fonctionnement de l'application.
+
+Pour une sécurité maximale en production, il faudrait :
+1. Utiliser des nonces ou hashes pour les styles inline
+2. Modifier la configuration Angular pour externaliser tous les styles
+
+---
