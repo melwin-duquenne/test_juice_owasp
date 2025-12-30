@@ -253,6 +253,28 @@ restoreOverwrittenFilesWithOriginals().then(() => {
     next()
   })
 
+  /* Block cloud metadata requests (SSRF protection) */
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const blockedPatterns = [
+      /169\.254\.169\.254/, // AWS metadata
+      /metadata\.google\.internal/, // GCP metadata
+      /169\.254\.170\.2/, // AWS ECS metadata
+      /fd00:ec2::254/, // AWS IPv6 metadata
+      /localhost:80\/computeMetadata/, // GCP alt
+      /metadata\.azure\.internal/, // Azure metadata
+      /100\.100\.100\.200/ // Alibaba Cloud metadata
+    ]
+
+    const urlToCheck = req.url + (req.headers.host ?? '')
+    for (const pattern of blockedPatterns) {
+      if (pattern.test(urlToCheck)) {
+        res.status(403).json({ error: 'Access to cloud metadata is blocked' })
+        return
+      }
+    }
+    next()
+  })
+
   /* Increase request counter metric for every request */
   app.use(metrics.observeRequestMetricsMiddleware())
 

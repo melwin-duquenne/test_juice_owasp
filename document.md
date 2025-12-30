@@ -1028,3 +1028,48 @@ res.status(403).json({ error: 'Only .md and .pdf files are allowed!' })
 | `/ftp/*` | 50 req | 1 min | Scan fichiers |
 
 ---
+
+## Correction des vulnérabilités ZAP supplémentaires
+
+### 1. Vulnerable JS Library - jQuery mis à jour
+
+**Problème** : jQuery 2.2.4 contenait plusieurs vulnérabilités XSS connues (CVE-2020-11022, CVE-2020-11023).
+
+**Solution** : Mise à jour vers jQuery 3.7.1
+
+```
+frontend/src/assets/public/vendor/jquery.min.js
+Version: 2.2.4 → 3.7.1
+```
+
+### 2. Protection contre les métadonnées Cloud (SSRF)
+
+**Problème** : ZAP détectait une vulnérabilité potentielle d'accès aux métadonnées cloud.
+
+**Solution** : Middleware bloquant l'accès aux endpoints de métadonnées cloud :
+
+```typescript
+/* Block cloud metadata requests (SSRF protection) */
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const blockedPatterns = [
+    /169\.254\.169\.254/,        // AWS metadata
+    /metadata\.google\.internal/, // GCP metadata
+    /169\.254\.170\.2/,          // AWS ECS metadata
+    /fd00:ec2::254/,             // AWS IPv6 metadata
+    /metadata\.azure\.internal/, // Azure metadata
+    /100\.100\.100\.200/         // Alibaba Cloud metadata
+  ]
+  // Bloque les requêtes correspondantes
+})
+```
+
+### 3. Note sur les alertes restantes
+
+| Alerte ZAP | Sévérité | Explication |
+|------------|----------|-------------|
+| CSP: script-src unsafe-inline | Faible | Requis pour le script cookie consent dans index.html |
+| CSP: style-src unsafe-inline | Faible | Requis pour Angular Material |
+| Timestamp Disclosure | Informatif | Timestamps dans les réponses API (comportement normal) |
+| ZAP is Out of Date | N/A | Concerne ZAP lui-même, pas l'application |
+
+---
