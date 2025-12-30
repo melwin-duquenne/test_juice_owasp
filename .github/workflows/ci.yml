@@ -343,7 +343,7 @@ jobs:
       - docker
       - heroku
       - lint
-      - coding-challenge-rsn
+      # - coding-challenge-rsn  # Disabled for fork
       - smoke-test
       - coverage-report
     runs-on: ubuntu-latest
