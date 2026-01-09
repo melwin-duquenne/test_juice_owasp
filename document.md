@@ -1,372 +1,166 @@
-# Documentation des erreurs de sécurité
+# Documentation des corrections de sécurité - OWASP Juice Shop
+
+## Table des matières
+
+1. [Analyse SonarQube](#analyse-sonarqube)
+2. [Analyse des dépendances npm](#analyse-des-dépendances-npm)
+3. [Analyse OWASP ZAP](#analyse-owasp-zap)
+4. [Corrections appliquées](#corrections-appliquées)
+5. [Améliorations infrastructure](#améliorations-infrastructure)
+6. [Résumé et recommandations](#résumé-et-recommandations)
+
+---
 
 ## Analyse SonarQube
 
-![Capture de SonarQube avant la correction des erreurs de sécurité](image_document/SonarErreur.png)
+![Capture de SonarQube avant correction](image_document/SonarErreur.png)
 
-Ce document présente les principales vulnérabilités détectées dans l’application à l’aide de SonarQube.
+### Vulnérabilités détectées
 
----
+| # | Vulnérabilité | Fichiers concernés |
+|---|---------------|-------------------|
+| 1 | Jetons JWT exposés en clair | `app.guard.spec.ts:38`, `last-login-ip.component.spec.ts:61` |
+| 2 | Clé privée exposée | `lib/insecurity.ts:23` |
+| 3 | Exécution dynamique de code | `routes/b2bOrder.ts`, `routes/createProductReviews.ts`, `server.ts:304`, `routes/fileUpload.ts`, `routes/likeProductReviews.ts`, `routes/orderHistory.ts`, `routes/redirect.ts`, `routes/showProductReviews.ts`, `routes/trackOrder.ts`, `routes/updateProductReviews.ts` |
+| 4 | Construction de chemins non sécurisée | `routes/fileUpload.ts`, `routes/profileImageUrlUpload.ts`, `routes/vulnCodeFixes.ts`, `routes/vulnCodeSnippet.ts` |
+| 5 | Injection SQL | `routes/login.ts:34`, `routes/search.ts:21-23` |
+| 6 | Seed phrase exposée | `routes/checkKeys.ts` |
+| 7 | Clé HMAC exposée | `lib/insecurity.ts` |
+| 8 | Injection MongoDB | `routes/createProductReviews.ts` |
+| 9 | Injection via res.render | `routes/dataErasure.ts` |
+| 10 | Template Pug non sécurisé | `routes/errorHandler.ts` |
 
-### 1. Jetons JWT exposés en clair
-
-**Fichiers concernés :**
-- frontend/src/app/app.guard.spec.ts (ligne 38)
-- frontend/src/app/last-login-ip/last-login-ip.component.spec.ts (ligne 61)
-
-Description : JWT présent en clair dans le code source.
-
----
-
-### 2. Clé privée exposée dans le code
-
-**Fichier concerné :**
-- lib/insecurity.ts (ligne 23)
-
-Description : Clé privée laissée en clair dans le code.
+![Capture de SonarQube après correction](image_document/SonarCorrection.png)
 
 ---
 
-### 3. Exécution dynamique de code influencé par l’utilisateur
+## Analyse des dépendances npm
 
-**Fichiers concernés :**
-- routes/b2bOrder.ts (lignes 19 à 23)
-- routes/createProductReviews.ts (lignes 23, 26)
-- server.ts (ligne 304)
-- routes/fileUpload.ts (lignes 79 à 83, 112, 116)
-- routes/likeProductReviews.ts (lignes 18, 25, 35, 36, 43, 50, 51)
-- routes/commande.ts (lignes 154, 156)
-- routes/orderHistory.ts (ligne 36)
-- routes/redirect.ts (lignes 15, 19)
-- routes/showProductReviews.ts (lignes 31 à 36)
-- routes/trackOrder.ts (lignes 15 à 18)
-- routes/updateProductReviews.ts (ligne 17)
+### Vulnérabilités critiques et hautes
 
-Description : Exécution de code à partir de données contrôlées par l’utilisateur.
-
----
-
-### 4. Construction de chemins ou d’URL à partir de données utilisateur
-
-**Fichiers concernés :**
-- routes/fileUpload.ts (lignes 40, 41, 45)
-- routes/profileImageUrlUpload.ts (lignes 19, 24)
-- routes/vulnCodeFixes.ts (lignes 71, 81)
-- routes/vulnCodeSnippet.ts (lignes 71, 90)
-
-Description : Chemins de fichiers ou URLs construits à partir de données utilisateur.
+| Package | Version vulnérable | Sévérité | Description |
+|---------|-------------------|----------|-------------|
+| jsonwebtoken | 0.4.0 | **CRITIQUE** | Version obsolète (2013), multiples CVE |
+| express-jwt | 0.1.3 | **HAUTE** | Bypass d'autorisation (GHSA-6g6m-m6h5-w9gf) |
+| sanitize-html | 1.4.2 | **HAUTE** | XSS via contournement |
+| marsdb | * | **CRITIQUE** | Command Injection (GHSA-5mrr-rgp6-x4gr) |
+| vm2 (via juicy-chat-bot) | * | **CRITIQUE** | Sandbox Escape (GHSA-whpj-8f3w-67p5) |
+| unzipper | 0.9.15 | **HAUTE** | Zip Slip path traversal |
+| socket.io | 3.1.2 | **HAUTE** | Vulnérabilités engine.io/ws |
+| js-yaml | 3.14.0 | **HAUTE** | Exécution de code arbitraire |
+| express-ipfilter (ip) | * | **HAUTE** | SSRF (GHSA-2p57-rm9w-gvfp) |
+| download (got) | * | **HAUTE** | Multiples vulnérabilités |
 
 ---
 
-### 5. Construction de requêtes SQL à partir de données utilisateur
+## Analyse OWASP ZAP
 
-**Fichiers concernés :**
-- routes/login.ts (ligne 34)
-- routes/search.ts (lignes 21 à 23)
+### Vulnérabilités identifiées
 
-Description : Requêtes SQL construites directement à partir de données utilisateur.
-
----
-
-### 6. Seed phrase exposée en clair
-
-**Fichier concerné :**
-
-- routes/checkKeys.ts (ligne contenant la seed phrase)
-
-Description : Seed phrase (phrase de récupération) codée en dur dans le code source.
+| Vulnérabilité | Sévérité | Endpoints affectés |
+|---------------|----------|-------------------|
+| CSP: Wildcard Directive | Moyenne | Tous (8+) |
+| CSP: script-src unsafe-eval | Moyenne | Tous (8+) |
+| CSP: script-src unsafe-inline | Faible | Tous (8+) |
+| CSP: style-src unsafe-inline | Faible | Tous (8+) |
+| Mauvaise configuration CORS | Moyenne | 31 endpoints |
+| Vulnerable JS Library (jQuery) | Moyenne | jQuery 2.2.4 |
+| Cloud Metadata SSRF | Moyenne | Potentiel |
 
 ---
 
-### 7. Clé HMAC exposée en clair
+## Corrections appliquées
 
-**Fichier concerné :**
+### 1. Secrets et credentials externalisés
 
-- lib/insecurity.ts (ligne contenant la clé HMAC)
+| Secret | Variable d'environnement | Fichier |
+|--------|-------------------------|---------|
+| Clé privée JWT | `PRIVATE_KEY` | `lib/insecurity.ts` |
+| Clé HMAC | `HMAC_SECRET` | `lib/insecurity.ts` |
+| Seed phrase | `MNEMONIC_SEED` | `routes/checkKeys.ts` |
+| JWT de test | `TEST_JWT` | `app.guard.spec.ts` |
+| JWT de test (login IP) | `TEST_JWT_LAST_LOGIN_IP` | `last-login-ip.component.spec.ts` |
 
-Description : Clé HMAC codée en dur dans le code source.
+### 2. Injection SQL
 
----
+**routes/login.ts** : Requête SQL brute remplacée par ORM Sequelize
 
-### 8. Construction de requêtes MongoDB à partir de données utilisateur non validées
+```typescript
+// AVANT - Vulnérable
+const query = `SELECT * FROM Users WHERE email = '${email}' AND password = '${password}'`
 
-**Fichier concerné :**
+// APRÈS - Sécurisé
+UserModel.findOne({ where: { email, password } })
+```
 
-- routes/createProductReviews.ts (insertion du champ product à partir de req.params.id)
+**routes/search.ts** : Critère de recherche validé et nettoyé avant utilisation.
 
-Description : L’id produit était inséré en base sans validation, ce qui permettait une potentielle injection ou un comportement inattendu.
+### 3. Injection NoSQL/MongoDB
 
----
+**Fichiers corrigés** : `trackOrder.ts`, `showProductReviews.ts`, `updateProductReviews.ts`, `likeProductReviews.ts`, `createProductReviews.ts`
 
-### 9. Injection de données utilisateur dans res.render (dataErasureResult)
+```typescript
+// AVANT - Vulnérable ($where permet l'exécution de code)
+reviews.find({ $where: `this._id === '${id}'` })
 
-**Fichier concerné :**
+// APRÈS - Sécurisé
+if (!/^[a-fA-F0-9]{24}$/.test(id)) {
+  return res.status(400).json({ error: 'Invalid ID' })
+}
+reviews.findOne({ _id: id })
+```
 
-- routes/dataErasure.ts (passage de ...req.body à res.render)
+### 4. Exécution de code dynamique
 
-Description : Les données utilisateur étaient passées telles quelles à res.render, ce qui pouvait permettre une injection de variables ou un comportement inattendu dans le template.
+**routes/b2bOrder.ts** : Suppression de `safeEval`
 
----
+```typescript
+// AVANT - Vulnérable
+const orderLines = safeEval(orderLinesData)
 
-### 10. Compilation dynamique de template Pug sans restriction
+// APRÈS - Sécurisé (parsing JSON uniquement)
+const orderLines = JSON.parse(orderLinesData)
+```
 
-**Fichier concerné :**
+**routes/fileUpload.ts** : Suppression de l'exécution via `vm`, parsing direct des fichiers.
 
-- routes/errorHandler.ts (utilisation de pug.compile sur un template dynamique)
+### 5. Path Traversal et SSRF
 
-Description : La compilation dynamique de template Pug sans option de sécurité pouvait permettre l’exécution de code non prévu si le template était modifié ou corrompu.
+**routes/profileImageUrlUpload.ts** :
 
----
-
-### 11. Injection de contenu dangereux dans le template d’erreur Pug
-
-**Fichier concerné :**
-
-- routes/errorHandler.ts (passage de error directement au template)
-
-Description : L’objet error était passé tel quel au template Pug, ce qui pouvait permettre l’injection de contenu HTML ou scripté dans la page d’erreur.
-
----
-
-## Correction des erreurs Analyser par SonarQube
-
-### Correction : Exécution dynamique de code influencé par l’utilisateur dans routes/trackOrder.ts
-
-Le paramètre id est désormais validé comme alphanumérique/tiret uniquement et l’utilisation dangereuse de $where a été supprimée au profit d’une requête MongoDB classique. Cela empêche toute injection ou exécution de code via ce paramètre.
-
-### Correction : Exécution dynamique de code influencé par l’utilisateur dans routes/showProductReviews.ts
-
-Le paramètre id est désormais validé comme strictement numérique et l’utilisation dangereuse de $where a été supprimée au profit d’une requête MongoDB classique. Cela empêche toute injection ou exécution de code via ce paramètre.
-
-### Correction : Exécution dynamique de code influencé par l’utilisateur dans routes/updateProductReviews.ts
-
-Le paramètre id est désormais validé comme un ObjectId MongoDB valide (24 caractères hexadécimaux) et le champ message est nettoyé (suppression de balises HTML et de caractères spéciaux dangereux) avant d’être inséré en base. Cela empêche toute tentative d’injection NoSQL ou de contenu malveillant via ces champs.
-
-### Correction : Exécution dynamique de code influencé par l’utilisateur dans routes/redirect.ts
-
-Le paramètre to est désormais validé comme une URL correcte et nettoyé avant toute redirection. Cela empêche toute redirection ouverte ou manipulation dangereuse via ce paramètre.
-
-### Correction : Exécution dynamique de code influencé par l’utilisateur dans routes/orderHistory.ts
-
-L’email et l’id utilisateur sont désormais validés et nettoyés avant d’être utilisés dans la requête. Cela empêche toute tentative d’injection ou d’abus via ces champs.
-
-### Correction : Exécution dynamique de code influencé par l’utilisateur dans routes/likeProductReviews.ts
-
-L’id reçu est désormais validé (doit être un ObjectId valide) et l’email utilisateur est nettoyé avant d’être ajouté à la liste likedBy. Cela empêche toute tentative d’injection ou d’abus via ces champs.
-
-### Correction : Exécution dynamique de code influencé par l’utilisateur et construction de chemins dans routes/fileUpload.ts
-
-L’exécution dynamique de code utilisateur via vm a été supprimée dans handleXmlUpload et handleYamlUpload. Les fichiers sont désormais parsés directement sans exécution de code. Dans handleZipFileUpload, la construction du chemin d’extraction est sécurisée pour empêcher toute écriture en dehors du dossier prévu.
-
-### Correction : Exécution dynamique de code influencé par l’utilisateur dans routes/createProductReviews.ts
-
-Les champs message et author sont désormais nettoyés (suppression de balises HTML et de caractères spéciaux dangereux) avant d’être insérés en base. Cela empêche toute tentative d’injection ou de contenu malveillant via ces champs.
-
-### Correction : Exécution dynamique de code influencé par l’utilisateur dans routes/b2bOrder.ts
-
-L’exécution dynamique de code utilisateur via safeEval a été supprimée. L’entrée orderLinesData est désormais uniquement acceptée si elle est un JSON valide, sans aucune exécution dynamique. Cela empêche toute injection de code malveillant par l’utilisateur.
-
-### Correction : Construction de chemins ou d’URL à partir de données utilisateur dans routes/profileImageUrlUpload.ts
-
-Le paramètre imageUrl est désormais validé pour n’accepter que des URLs http(s) valides, sans séquences de traversée de répertoire (..), et seules les extensions de fichiers d’images autorisées sont acceptées. Cela empêche toute attaque SSRF, traversée de chemin ou injection via ce champ.
-
-### Correction : Construction de chemins à partir de données utilisateur dans routes/vulnCodeFixes.ts
-
-Les accès aux fichiers sont désormais sécurisés par une validation stricte des noms de fichiers et de clés (aucune traversée de répertoire possible, seuls les caractères sûrs sont acceptés). Cela empêche toute tentative de lecture ou d’écriture de fichiers non autorisés via des chemins construits à partir de données utilisateur.
-
-### Correction : Construction de chemins à partir de données utilisateur dans routes/vulnCodeSnippet.ts
-
-La clé utilisée pour accéder aux fichiers est désormais validée pour n’accepter que des caractères sûrs (aucune traversée de répertoire possible). Cela empêche toute tentative d’accès à des fichiers non autorisés via des chemins construits à partir de données utilisateur.
-
-### Correction : Construction de requêtes SQL à partir de données utilisateur dans routes/login.ts
-
-La requête SQL brute a été supprimée et remplacée par l’utilisation de UserModel.findOne avec des conditions (ORM Sequelize). Les champs email et password sont toujours validés et nettoyés, puis passés comme paramètres à la méthode findOne, ce qui élimine totalement le risque d’injection SQL. Plus aucune chaîne SQL n’est construite à partir de données utilisateur.
-
-### Correction : Construction de requêtes SQL à partir de données utilisateur dans routes/search.ts
-
-Le critère de recherche est désormais validé et nettoyé avant d’être utilisé dans la requête SQL. Cela empêche toute tentative d’injection SQL via ce champ.
-
-### Correction : Clé privée exposée en clair dans lib/insecurity.ts
-
-La clé privée utilisée dans le code (ligne 23) est désormais lue depuis la variable d’environnement PRIVATE_KEY, définie dans un fichier .env ou dans l’environnement d’exécution. Cela évite d’exposer une clé sensible en clair dans le code source.
-
-### Correction : Jeton JWT exposé en clair dans last-login-ip.component.spec.ts
-
-Le JWT utilisé dans le test unitaire (ligne 61) est désormais lu depuis la variable d’environnement TEST_JWT_LAST_LOGIN_IP, définie dans un fichier .env ou dans l’environnement d’exécution. Cela évite d’exposer un jeton en clair dans le code source.
-
-### Correction : Jeton JWT exposé en clair dans app.guard.spec.ts
-
-Le JWT utilisé dans le test unitaire (ligne 38) est désormais lu depuis la variable d’environnement TEST_JWT, définie dans un fichier .env ou dans l’environnement d’exécution. Cela évite d’exposer un jeton en clair dans le code source.
-
-### Correction : Seed phrase exposée en clair dans routes/checkKeys.ts
-
-La seed phrase utilisée dans le code (anciennement codée en dur dans la fonction checkKeys) est désormais lue depuis la variable d’environnement MNEMONIC_SEED, définie dans un fichier .env ou dans l’environnement d’exécution. Cela évite d’exposer une phrase de récupération sensible en clair dans le code source.
-
-### Correction : Clé HMAC exposée en clair dans lib/insecurity.ts
-
-La clé HMAC utilisée dans le code (anciennement codée en dur dans la fonction hmac) est désormais lue depuis la variable d’environnement HMAC_SECRET, définie dans un fichier .env ou dans l’environnement d’exécution. Cela évite d’exposer une clé sensible en clair dans le code source.
-
-### Correction : Validation de l’id produit dans routes/createProductReviews.ts
-
-L’id produit (req.params.id) est désormais validé comme un ObjectId MongoDB valide (24 caractères hexadécimaux) avant d’être inséré en base. Cela empêche toute tentative d’injection ou d’abus via ce champ.
-
-### Correction : Passage de données filtrées à res.render dans routes/dataErasure.ts
-
-Seuls les champs explicitement attendus (email, securityAnswer) sont désormais transmis à res.render, empêchant toute injection ou abus via d’autres champs du body.
-
-### Correction : Compilation stricte du template Pug dans routes/errorHandler.ts
-
-Le template Pug est désormais compilé avec des options restrictives (compileDebug: false, inlineRuntimeFunctions: false, filename renseigné) pour limiter les risques d’exécution de code non prévu lors de la gestion des erreurs.
-
-### Correction : Sanitation de l’objet error dans routes/errorHandler.ts
-
-L’objet error est désormais nettoyé (remplacement des chevrons < et >) avant d’être passé au template Pug, empêchant toute injection de contenu HTML ou scripté dans la page d’erreur.
-
-## SonarQube aprés correction
-
-![Capture de SonarQube aprés la correction des erreurs de sécurité](image_document/SonarCorrection.png)
-
----
-
-## Analyse et correction des vulnérabilités des dépendances (npm)
-
-### Vulnérabilités détectées via npm audit
-
-L'analyse des dépendances avec `npm audit` a révélé plusieurs vulnérabilités critiques et hautes :
-
-| Package | Version vulnérable | Sévérité | CVE/GHSA | Description |
-|---------|-------------------|----------|----------|-------------|
-| jsonwebtoken | 0.4.0 | **CRITIQUE** | Multiples CVE | Version obsolète (2013) avec nombreuses failles |
-| express-jwt | 0.1.3 | **HAUTE** | GHSA-6g6m-m6h5-w9gf | Bypass d'autorisation |
-| sanitize-html | 1.4.2 | **HAUTE** | Multiples | XSS via contournement de la sanitization |
-| crypto-js (via pdfkit) | < 4.2.0 | **CRITIQUE** | GHSA-xwcq-pm8m-c4vf | PBKDF2 faible |
-| unzipper | 0.9.15 | **HAUTE** | Zip Slip | Path traversal lors de l'extraction |
-| socket.io | 3.1.2 | **HAUTE** | Multiples | Vulnérabilités engine.io/ws |
-| helmet | 4.6.0 | **MOYENNE** | - | Version obsolète |
-| js-yaml | 3.14.0 | **HAUTE** | - | Exécution de code arbitraire |
-| http-server | 0.12.3 | **MOYENNE** | GHSA-jc84-3g44-wf2q | DoS via ecstatic |
-
-### Corrections appliquées dans package.json
-
-Les versions suivantes ont été mises à jour :
-
-```json
-{
-  "jsonwebtoken": "^9.0.2",      // Était: 0.4.0
-  "express-jwt": "^8.4.1",       // Était: 0.1.3
-  "sanitize-html": "^2.13.1",    // Était: 1.4.2
-  "unzipper": "^0.12.3",         // Était: 0.9.15
-  "socket.io": "^4.8.1",         // Était: 3.1.2
-  "helmet": "^8.0.0",            // Était: 4.6.0
-  "pdfkit": "^0.15.2",           // Était: 0.11.0 (corrige crypto-js)
-  "js-yaml": "^4.1.0",           // Était: 3.14.0
-  "socket.io-client": "^4.8.1",  // Était: 3.1.3 (devDep)
-  "http-server": "^14.1.1"       // Était: 0.12.3 (devDep)
+```typescript
+// Validation sécurisée
+const parsedUrl = new URL(imageUrl)
+if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+  return res.status(400).json({ error: 'Invalid protocol' })
+}
+if (imageUrl.includes('..')) {
+  return res.status(400).json({ error: 'Path traversal detected' })
+}
+const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+if (!allowedExtensions.some(ext => parsedUrl.pathname.toLowerCase().endsWith(ext))) {
+  return res.status(400).json({ error: 'Invalid file extension' })
 }
 ```
 
----
+### 6. Redirections ouvertes
 
-## Sécurisation du Dockerfile
-
-### Problèmes identifiés
-
-1. **--unsafe-perm** : Option risquée permettant l'exécution de scripts avec des privilèges élevés
-2. **Absence de HEALTHCHECK** : Pas de vérification de l'état de santé du conteneur
-3. **Absence d'audit npm** : Pas de vérification des vulnérabilités pendant le build
-4. **Permissions trop larges** : `g=u` accordait des permissions excessives
-
-### Corrections appliquées
-
-```dockerfile
-# Suppression de --unsafe-perm
-RUN npm install --omit=dev
-
-# Ajout de l'audit de sécurité pendant le build
-RUN npm audit --audit-level=high --omit=dev || echo "Security audit completed with warnings"
-
-# Permissions plus restrictives
-RUN chmod -R 750 ftp/ frontend/dist/ data/ i18n/
-RUN chmod -R 770 logs/
-
-# Ajout du HEALTHCHECK pour la surveillance du conteneur
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD ["/nodejs/bin/node", "-e", "require('http').get('http://localhost:3000/rest/admin/application-version', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
-```
-
----
-
-## Création du middleware de sécurité global
-
-### Nouveau fichier : lib/securityMiddleware.ts
-
-Un nouveau module de sécurité a été créé pour centraliser les protections :
-
-#### 1. Protection contre le Path Traversal
+**lib/insecurity.ts** : Validation stricte par parsing d'URL
 
 ```typescript
-export const preventPathTraversal = () => {
-  // Bloque les patterns suspects :
-  // - ../ et ..\ (traversée de répertoire)
-  // - Encodages URL (%2e, %2f, %5c)
-  // - Encodages UTF-8 (%c0%ae, %c1%9c)
-  // - Injection de null byte (%00)
-}
-```
-
-#### 2. Headers de sécurité supplémentaires
-
-```typescript
-export const additionalSecurityHeaders = () => {
-  // X-Content-Type-Options: nosniff
-  // X-Frame-Options: DENY
-  // X-XSS-Protection: 1; mode=block
-  // Referrer-Policy: strict-origin-when-cross-origin
-  // Permissions-Policy: geolocation=(), microphone=(), camera=()
-  // Content-Security-Policy: default-src 'self'; ...
-}
-```
-
-#### 3. Sanitization des requêtes
-
-```typescript
-export const sanitizeRequestBody = () => {
-  // Détection et logging des patterns dangereux :
-  // - Balises <script>
-  // - Protocole javascript:
-  // - Event handlers (onclick, onerror, etc.)
-  // - Opérateurs MongoDB ($where, $ne, $gt, etc.)
-}
-```
-
----
-
-## Correction de la validation des redirections
-
-### Vulnérabilité identifiée dans lib/insecurity.ts
-
-L'ancienne implémentation utilisait `url.includes(allowedUrl)` ce qui permettait des contournements :
-
-```typescript
-// VULNÉRABLE - Ancienne version
+// AVANT - Contournable avec https://evil.com?redirect=https://github.com/juice-shop
 export const isRedirectAllowed = (url: string) => {
   for (const allowedUrl of redirectAllowlist) {
-    allowed = allowed || url.includes(allowedUrl) // Contournable !
+    allowed = allowed || url.includes(allowedUrl)
   }
 }
-// Exemple d'attaque : https://evil.com?redirect=https://github.com/juice-shop/juice-shop
-```
 
-### Correction appliquée
-
-```typescript
-// SÉCURISÉ - Nouvelle version
+// APRÈS - Sécurisé
 export const isRedirectAllowed = (url: string) => {
   try {
     const parsedUrl = new URL(url)
     for (const allowedUrl of redirectAllowlist) {
       const parsedAllowed = new URL(allowedUrl)
-      // Validation stricte : protocol + host doivent correspondre exactement
       if (parsedUrl.protocol === parsedAllowed.protocol &&
           parsedUrl.host === parsedAllowed.host) {
         if (parsedUrl.pathname === parsedAllowed.pathname ||
@@ -377,234 +171,133 @@ export const isRedirectAllowed = (url: string) => {
     }
     return false
   } catch {
-    return false // URL invalide = rejetée
-  }
-}
-```
-
----
-
-## Intégration des middlewares dans server.ts
-
-Les middlewares de sécurité ont été intégrés dans le fichier principal du serveur :
-
-```typescript
-import { preventPathTraversal, additionalSecurityHeaders, sanitizeRequestBody } from './lib/securityMiddleware'
-
-// Dans la configuration de l'application :
-
-/* Additional security middleware - Path traversal protection */
-app.use(preventPathTraversal())
-
-/* Additional security headers */
-app.use(additionalSecurityHeaders())
-
-/* Request body sanitization (logging only) */
-app.use(sanitizeRequestBody())
-```
-
----
-
-## Résumé des améliorations de sécurité
-
-| Catégorie | Avant | Après |
-|-----------|-------|-------|
-| Dépendances vulnérables | 10+ packages critiques/hauts | Mis à jour vers versions sécurisées |
-| Docker | --unsafe-perm, pas de healthcheck | Permissions restrictives, healthcheck, audit |
-| Path Traversal | Protection partielle | Middleware global avec patterns multiples |
-| Redirections | Validation par includes() | Validation stricte URL parsée |
-| Headers HTTP | Helmet basique | Headers CSP, Permissions-Policy ajoutés |
-| Monitoring | Aucun logging sécurité | Logging des tentatives d'injection |
-
----
-
-## Corrections de compatibilité et packages obsolètes
-
-### Packages obsolètes identifiés et remplacés
-
-| Package | Problème | Solution |
-|---------|----------|----------|
-| `jws` | Redondant avec jsonwebtoken, vulnérabilités potentielles | Supprimé, remplacé par `jwt.decode()` de jsonwebtoken |
-| `node-pre-gyp` | Déprécié | Remplacé par `@mapbox/node-pre-gyp` |
-| `notevil` | Exécution de code avec contournements connus | Supprimé (non utilisé directement) |
-| `feature-policy` | Obsolète, remplacé par Permissions-Policy | Supprimé, intégré via helmet 8.x |
-| `html-entities` v1 | API obsolète | Mis à jour vers v2.5.2 avec nouvelle API |
-
-### Correction de express-jwt (v0.1.3 → v8.4.1)
-
-**Problème** : L'API de express-jwt a complètement changé entre les versions.
-
-**Fichier modifié** : `lib/insecurity.ts`
-
-```typescript
-// AVANT (v0.1.3) - VULNÉRABLE
-import expressJwt from 'express-jwt'
-export const isAuthorized = () => expressJwt(({ secret: publicKey }) as any)
-
-// APRÈS (v8.4.1) - SÉCURISÉ
-import { expressjwt } from 'express-jwt'
-export const isAuthorized = () => expressjwt({
-  secret: publicKey,
-  algorithms: ['RS256']  // Algorithme obligatoire maintenant
-})
-```
-
-**Amélioration de sécurité** : La spécification explicite des algorithmes empêche les attaques de type "algorithm confusion".
-
-### Suppression de jws au profit de jsonwebtoken
-
-**Fichiers modifiés** : `lib/insecurity.ts`, `routes/verify.ts`
-
-```typescript
-// AVANT - Utilisation de jws
-import jws from 'jws'
-export const verify = (token: string) => jws.verify(token, publicKey)
-export const decode = (token: string) => jws.decode(token)?.payload
-
-// APRÈS - Utilisation de jsonwebtoken uniquement
-import jwt from 'jsonwebtoken'
-export const verify = (token: string) => {
-  try {
-    jwt.verify(token, publicKey, { algorithms: ['RS256'] })
-    return true
-  } catch {
     return false
   }
 }
-export const decode = (token: string) => jwt.decode(token)
 ```
 
-### Mise à jour de html-entities (v1 → v2)
+### 7. Template Injection (Pug)
 
-**Fichier modifié** : `lib/challengeUtils.ts`
-
-```typescript
-// AVANT (v1) - API obsolète
-import { AllHtmlEntities as Entities } from 'html-entities'
-const entities = new Entities()
-entities.decode(html)
-
-// APRÈS (v2) - Nouvelle API
-import { decode as htmlDecode } from 'html-entities'
-htmlDecode(html)
-```
-
-### Remplacement de feature-policy par helmet intégré
-
-**Fichier modifié** : `server.ts`
-
-```typescript
-// AVANT - Package obsolète
-import featurePolicy from 'feature-policy'
-app.use(featurePolicy({ features: { payment: ["'self'"] } }))
-
-// APRÈS - Configuration helmet moderne
-app.use(helmet({
-  contentSecurityPolicy: false,  // Géré séparément
-  crossOriginEmbedderPolicy: false,
-  crossOriginResourcePolicy: { policy: 'cross-origin' }
-}))
-// + Permissions-Policy via additionalSecurityHeaders middleware
-```
-
-### Types TypeScript supprimés (obsolètes)
-
-Les packages suivants incluent maintenant leurs propres définitions TypeScript :
-
-- `@types/express-jwt` → express-jwt 8.x inclut ses types
-- `@types/socket.io` → socket.io 4.x inclut ses types
-- `@types/socket.io-client` → socket.io-client 4.x inclut ses types
-- `@types/jws` → Package jws supprimé
-
----
-
-## Résumé final des fichiers modifiés
-
-| Fichier | Type de modification |
-|---------|---------------------|
-| `package.json` | Mise à jour dépendances, suppression packages obsolètes |
-| `Dockerfile` | Sécurisation build, ajout healthcheck |
-| `lib/insecurity.ts` | Correction express-jwt, jws, validation redirections |
-| `lib/securityMiddleware.ts` | **Nouveau** - Middlewares de sécurité |
-| `lib/challengeUtils.ts` | Mise à jour html-entities |
-| `routes/verify.ts` | Suppression jws |
-| `server.ts` | Intégration middlewares, suppression feature-policy |
-| `document.md` | Documentation complète |
-
----
-
-## Corrections des vulnérabilités npm audit
-
-### Vulnérabilités CRITIQUES corrigées
-
-#### 1. marsdb - Command Injection (GHSA-5mrr-rgp6-x4gr)
-
-**Problème** : Le package marsdb contenait une vulnérabilité d'injection de commandes critique sans correctif disponible.
-
-**Solution** : Remplacement complet par une implémentation sécurisée en mémoire.
-
-**Fichier modifié** : `data/mongodb.ts`
+**routes/dataErasure.ts** : Filtrage des champs transmis
 
 ```typescript
 // AVANT - Vulnérable
-import * as MarsDB from 'marsdb'
-export const reviewsCollection = new MarsDB.Collection('posts')
+res.render('dataErasureResult', { ...req.body })
 
-// APRÈS - Implémentation sécurisée
-class SecureCollection {
-  private documents: Map<string, Document> = new Map()
-  // API compatible : find(), findOne(), insert(), update(), count()
-}
-export const reviewsCollection = new SecureCollection('reviews')
+// APRÈS - Sécurisé
+res.render('dataErasureResult', {
+  email: req.body.email,
+  securityAnswer: req.body.securityAnswer
+})
 ```
 
-#### 2. vm2 via juicy-chat-bot - Sandbox Escape (GHSA-whpj-8f3w-67p5) - CORRIGÉ
-
-**Problème** : Le package vm2 a des vulnérabilités de sandbox escape critiques. Il était utilisé par juicy-chat-bot.
-
-**Solution** : Création d'une implémentation alternative `SimpleChatBot` qui n'utilise pas vm2.
-
-**Fichiers créés/modifiés** :
-- `lib/SimpleChatBot.ts` - Nouvelle implémentation sécurisée
-- `routes/chatbot.ts` - Utilise SimpleChatBot au lieu de juicy-chat-bot
-- `package.json` - juicy-chat-bot supprimé
+**routes/errorHandler.ts** : Compilation sécurisée et échappement
 
 ```typescript
-// lib/SimpleChatBot.ts - Implémentation sécurisée
+// Compilation avec options restrictives
+const template = pug.compile(pugTemplate, {
+  compileDebug: false,
+  inlineRuntimeFunctions: false,
+  filename: 'error.pug'
+})
+
+// Nettoyage de l'objet error
+const sanitizedError = {
+  message: String(error.message || '').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
+  stack: String(error.stack || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+```
+
+### 8. Mise à jour des dépendances
+
+```json
+{
+  "jsonwebtoken": "^9.0.2",
+  "express-jwt": "^8.4.1",
+  "sanitize-html": "^2.13.1",
+  "unzipper": "^0.12.3",
+  "socket.io": "^4.8.1",
+  "helmet": "^8.0.0",
+  "pdfkit": "^0.15.2",
+  "js-yaml": "^4.1.0",
+  "socket.io-client": "^4.8.1",
+  "http-server": "^14.1.1",
+  "mocha": "^11.1.0",
+  "check-dependencies": "^2.0.0"
+}
+```
+
+### 9. Remplacement de packages vulnérables
+
+#### marsdb → SecureCollection
+
+```typescript
+// data/mongodb.ts - Implémentation sécurisée
+class SecureCollection<T extends BaseDocument = BaseDocument> {
+  private documents: Map<string, T> = new Map()
+
+  async find(query: Record<string, any> = {}): Promise<T[]> {
+    // Implémentation sécurisée sans injection possible
+  }
+
+  async findOne(query: Record<string, any> = {}): Promise<T | null> {
+    // ...
+  }
+
+  async insert(doc: Partial<T>): Promise<T> {
+    // ...
+  }
+
+  async update(query: Record<string, any>, update: Record<string, any>): Promise<number> {
+    // ...
+  }
+}
+
+export const reviewsCollection = new SecureCollection<Review>('reviews')
+export const ordersCollection = new SecureCollection<Order>('orders')
+```
+
+#### juicy-chat-bot → SimpleChatBot
+
+```typescript
+// lib/SimpleChatBot.ts - Sans dépendance à vm2
 class SimpleChatBot {
-  // Utilise fuzzy matching (fuzzball) au lieu de vm2
-  // Même API que juicy-chat-bot pour la compatibilité
-  // Pas de dépendance à vm2
-}
-```
+  private trainingSet: Map<string, string> = new Map()
 
-### Vulnérabilités HIGH corrigées
+  addTrainingData(key: string, response: string): void {
+    this.trainingSet.set(key.toLowerCase(), response)
+  }
 
-#### 3. express-ipfilter/ip - SSRF (GHSA-2p57-rm9w-gvfp)
-
-**Problème** : Le package `ip` utilisé par express-ipfilter a une vulnérabilité SSRF.
-
-**Solution** : Création d'un middleware de filtrage IP sécurisé.
-
-**Fichier créé** : `lib/securityMiddleware.ts`
-
-```typescript
-// Nouveau middleware secureIpFilter remplaçant express-ipfilter
-export const secureIpFilter = (allowedIps: string[], options: { mode: 'allow' | 'deny' }) => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const clientIp = getClientIp(req) // Extraction sécurisée
-    // Validation sans utiliser le package 'ip' vulnérable
+  getResponse(input: string): string {
+    // Utilise fuzzy matching (fuzzball) au lieu de vm2
+    const bestMatch = fuzz.extractOne(input.toLowerCase(), Array.from(this.trainingSet.keys()))
+    if (bestMatch && bestMatch[1] > 60) {
+      return this.trainingSet.get(bestMatch[0]) || this.defaultResponse
+    }
+    return this.defaultResponse
   }
 }
 ```
 
-#### 4. download/got/http-cache-semantics - Multiple vulnérabilités
+#### express-ipfilter → secureIpFilter
 
-**Problème** : Le package `download` dépend de `got` et `http-cache-semantics` vulnérables.
+```typescript
+// lib/securityMiddleware.ts
+export const secureIpFilter = (allowedIps: string[], options: { mode: 'allow' | 'deny' }) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const clientIp = getClientIp(req)
+    // Validation sans utiliser le package 'ip' vulnérable
+    const isAllowed = allowedIps.some(ip => clientIp === ip)
+    if ((options.mode === 'allow' && !isAllowed) ||
+        (options.mode === 'deny' && isAllowed)) {
+      return res.status(403).json({ error: 'Access denied' })
+    }
+    next()
+  }
+}
+```
 
-**Solution** : Remplacement par `axios` (déjà présent dans le projet).
-
-**Fichiers modifiés** : `lib/utils.ts`, `routes/chatbot.ts`
+#### download → axios
 
 ```typescript
 // AVANT
@@ -617,82 +310,41 @@ const response = await axios.get(url, { responseType: 'arraybuffer' })
 const data = Buffer.from(response.data)
 ```
 
-#### 5. check-dependencies/braces - DoS (GHSA-grv7-fg5c-xmjg)
+### 10. Corrections de compatibilité API
 
-**Problème** : Versions anciennes de braces via check-dependencies.
-
-**Solution** : Mise à jour vers check-dependencies@2.0.0
-
-### Vulnérabilités MODERATE corrigées
-
-#### 6. mocha/minimatch/nanoid
-
-**Problème** : Dépendances vulnérables dans mocha.
-
-**Solution** : Mise à jour vers mocha@11.1.0
-
-#### 7. @cyclonedx/cyclonedx-npm
-
-**Problème** : Versions vulnérables de xmlbuilder2/js-yaml.
-
-**Solution** : Mise à jour vers @cyclonedx/cyclonedx-npm@4.1.2
-
-### Packages supprimés
-
-| Package | Raison |
-|---------|--------|
-| `marsdb` | Remplacé par implémentation sécurisée |
-| `express-ipfilter` | Remplacé par secureIpFilter |
-| `download` | Remplacé par axios |
-| `@types/download` | Plus nécessaire |
-
----
-
-## Vulnérabilités restantes (non corrigeables)
-
-| Package | Sévérité | Raison |
-|---------|----------|--------|
-| `grunt-replace-json` (lodash.set) | HIGH | Pas de correctif disponible - outil de build uniquement |
-
-**Note** : La vulnérabilité `juicy-chat-bot` (vm2) a été **corrigée** en remplaçant le package par une implémentation sécurisée `SimpleChatBot`.
-
-**Recommandations pour les vulnérabilités restantes** :
-1. **grunt-replace-json** : Utiliser uniquement en développement, pas en production. Ce package est utilisé pour le packaging et n'affecte pas l'application en production.
-
----
-
-## Corrections TypeScript et compatibilité API
-
-### Corrections html-entities dans tous les fichiers
-
-**Problème** : L'API de html-entities v1 (`AllHtmlEntities`) n'existe plus dans la v2.
-
-**Fichiers corrigés** :
-- `data/datacreator.ts`
-- `routes/userProfile.ts`
-- `routes/videoHandler.ts`
+#### html-entities v1 → v2
 
 ```typescript
 // AVANT
 import { AllHtmlEntities as Entities } from 'html-entities'
 const entities = new Entities()
 entities.encode(text)
+entities.decode(html)
 
 // APRÈS
-import { encode as htmlEncode } from 'html-entities'
+import { encode as htmlEncode, decode as htmlDecode } from 'html-entities'
 htmlEncode(text)
+htmlDecode(html)
 ```
 
-### Corrections des types Socket.IO
+**Fichiers corrigés** : `challengeUtils.ts`, `datacreator.ts`, `userProfile.ts`, `videoHandler.ts`
 
-**Problème** : `SocketIOClientStatic` n'existe plus dans socket.io v4.
+#### express-jwt v0.1.3 → v8.4.1
 
-**Fichiers corrigés** :
-- `lib/challengeUtils.ts`
-- `lib/startup/registerWebsocketEvents.ts`
-- `test/api/socketSpec.ts`
-- `test/api/vulnCodeFixesSpec.ts`
-- `test/api/vulnCodeSnippetSpec.ts`
+```typescript
+// AVANT - Vulnérable (pas d'algorithme spécifié = algorithm confusion attack)
+import expressJwt from 'express-jwt'
+export const isAuthorized = () => expressJwt({ secret: publicKey } as any)
+
+// APRÈS - Sécurisé
+import { expressjwt } from 'express-jwt'
+export const isAuthorized = () => expressjwt({
+  secret: publicKey,
+  algorithms: ['RS256']
+})
+```
+
+#### socket.io-client v3 → v4
 
 ```typescript
 // AVANT
@@ -704,137 +356,104 @@ import { io, Socket } from 'socket.io-client'
 let socket: Socket
 ```
 
-### Correction types JWT dans lib/insecurity.ts
-
-**Problème** : Le retour de `verify() && decode()` créait un type union avec `false`.
-
-**Solution** : Création d'une fonction helper `getVerifiedToken()`.
+#### Suppression de jws (remplacé par jsonwebtoken)
 
 ```typescript
-const getVerifiedToken = (req: Request): DecodedToken | null => {
-  const token = utils.jwtFrom(req)
-  if (!token || !verify(token)) return null
-  return decode(token)
+// AVANT
+import jws from 'jws'
+export const verify = (token: string) => jws.verify(token, publicKey)
+export const decode = (token: string) => jws.decode(token)?.payload
+
+// APRÈS
+import jwt from 'jsonwebtoken'
+export const verify = (token: string) => {
+  try {
+    jwt.verify(token, publicKey, { algorithms: ['RS256'] })
+    return true
+  } catch {
+    return false
+  }
 }
-```
-
-### Correction SecureCollection types génériques
-
-**Problème** : Les types `Document` trop génériques causaient des erreurs de typage.
-
-**Solution** : SecureCollection est maintenant générique avec types spécifiques pour Review et Order.
-
-```typescript
-// data/mongodb.ts
-class SecureCollection<T extends BaseDocument = BaseDocument> {
-  async find(query: Record<string, any> = {}): Promise<T[]>
-  async findOne(query: Record<string, any> = {}): Promise<T | null>
-  // ...
-}
-
-export const reviewsCollection = new SecureCollection<Review>('reviews')
-export const ordersCollection = new SecureCollection<Order>('orders')
+export const decode = (token: string) => jwt.decode(token)
 ```
 
 ---
 
-## Corrections Frontend
+## Améliorations infrastructure
 
-### Mise à jour socket.io-client dans frontend/package.json
+### 1. Middleware de sécurité global (lib/securityMiddleware.ts)
 
-**Problème** : socket.io-client 3.1.0 avait des vulnérabilités.
+#### Protection Path Traversal
 
-**Solution** : Mise à jour vers 4.8.1
+```typescript
+export const preventPathTraversal = () => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const suspiciousPatterns = [
+      /\.\.\//,                    // ../
+      /\.\.\\/,                    // ..\
+      /%2e%2e%2f/i,               // URL encoded ../
+      /%2e%2e%5c/i,               // URL encoded ..\
+      /%c0%ae/i,                  // UTF-8 encoded .
+      /%c1%9c/i,                  // UTF-8 encoded \
+      /%00/                       // Null byte
+    ]
 
-```json
-{
-  "socket.io-client": "^4.8.1"  // Était: ^3.1.0
+    const fullPath = req.path + (req.url.includes('?') ? '?' + req.url.split('?')[1] : '')
+    for (const pattern of suspiciousPatterns) {
+      if (pattern.test(fullPath) || pattern.test(decodeURIComponent(fullPath))) {
+        return res.status(400).json({ error: 'Invalid path' })
+      }
+    }
+    next()
+  }
 }
 ```
 
-### Vulnérabilités restantes dans le frontend
-
-| Package | Sévérité | Raison |
-|---------|----------|--------|
-| `postcss` (via stylelint) | MODERATE | Dépendances dev pour linting SCSS |
-
-**Recommandation** : Ces vulnérabilités sont dans des outils de développement (stylelint) et n'affectent pas l'application en production.
-
----
-
-## Recommandations post-correction
-
-1. **Réinstaller les dépendances** :
-   ```bash
-   rm -rf node_modules package-lock.json
-   npm install
-   ```
-
-2. **Vérifier l'audit npm** :
-   ```bash
-   npm audit
-   ```
-
-3. **Tester l'application** :
-   ```bash
-   npm run test
-   npm run lint
-   ```
-
-4. **Rebuilder l'image Docker** :
-   ```bash
-   docker build -t juice-shop-secure .
-   ```
-
----
-
-## Analyse OWASP ZAP - Vulnérabilités détectées et corrections
-
-### Vulnérabilités identifiées par ZAP
-
-L'analyse de sécurité avec OWASP ZAP a révélé les vulnérabilités suivantes :
-
-| Vulnérabilité | Sévérité | Endpoints affectés |
-|---------------|----------|-------------------|
-| CSP: Wildcard Directive | Moyenne | Tous les endpoints (8+) |
-| CSP: script-src unsafe-eval | Moyenne | Tous les endpoints (8+) |
-| CSP: script-src unsafe-inline | Moyenne | Tous les endpoints (8+) |
-| CSP: style-src unsafe-inline | Faible | Tous les endpoints (8+) |
-| Mauvaise configuration CORS | Moyenne | 31 endpoints dont /ftp/*, /assets/*, etc. |
-
-### Détail des vulnérabilités
-
-#### 1. Content-Security-Policy (CSP) - Wildcard et unsafe-*
-
-**Problème** : L'application n'avait pas de CSP configurée, permettant :
-- L'exécution de scripts depuis n'importe quelle source
-- L'utilisation de `eval()` et `Function()` (unsafe-eval)
-- L'exécution de scripts inline (unsafe-inline)
-- Les styles inline sans restriction
-
-**Risques** :
-- Attaques XSS (Cross-Site Scripting)
-- Injection de code malveillant
-- Exfiltration de données
-
-#### 2. Mauvaise configuration CORS (Cross-Origin Resource Sharing)
-
-**Problème** : L'application utilisait `cors()` sans configuration, ce qui équivaut à :
-```
-Access-Control-Allow-Origin: *
-```
-
-**Risques** :
-- Accès aux ressources depuis n'importe quel domaine
-- Attaques CSRF facilitées
-- Fuite de données sensibles vers des domaines tiers
-
-### Corrections appliquées dans server.ts
-
-#### Configuration CORS sécurisée
+#### Headers de sécurité
 
 ```typescript
-// AVANT - Vulnérable
+export const additionalSecurityHeaders = () => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff')
+    res.setHeader('X-Frame-Options', 'DENY')
+    res.setHeader('X-XSS-Protection', '1; mode=block')
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()')
+    next()
+  }
+}
+```
+
+#### Sanitization des requêtes
+
+```typescript
+export const sanitizeRequestBody = () => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const dangerousPatterns = [
+      /<script/i,
+      /javascript:/i,
+      /on\w+\s*=/i,           // onclick=, onerror=, etc.
+      /\$where/i,             // MongoDB $where
+      /\$ne/i,                // MongoDB $ne
+      /\$gt/i,                // MongoDB $gt
+      /\$lt/i                 // MongoDB $lt
+    ]
+
+    const bodyStr = JSON.stringify(req.body)
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(bodyStr)) {
+        console.warn(`[SECURITY] Suspicious pattern detected: ${pattern} from IP: ${req.ip}`)
+      }
+    }
+    next()
+  }
+}
+```
+
+### 2. Configuration CORS sécurisée
+
+```typescript
+// AVANT - Vulnérable (Access-Control-Allow-Origin: *)
 app.options('*', cors())
 app.use(cors())
 
@@ -849,164 +468,122 @@ app.options('*', cors(corsOptions))
 app.use(cors(corsOptions))
 ```
 
-**Améliorations** :
-- Origine restreinte à l'application elle-même
-- Méthodes HTTP explicitement autorisées
-- Headers autorisés limités
-- Support des credentials pour l'authentification
-
-#### Configuration CSP stricte avec Helmet
+### 3. Content Security Policy
 
 ```typescript
-// AVANT - Pas de CSP
-app.use(helmet.noSniff())
-app.use(helmet.frameguard())
-
-// APRÈS - CSP complète
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"], // Nécessaire pour Angular
-      imgSrc: ["'self'", 'data:', 'https:'],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'https://gravatar.com', 'https://www.gravatar.com', 'https://i.imgur.com'],
       fontSrc: ["'self'", 'data:'],
       connectSrc: ["'self'"],
       frameSrc: ["'self'"],
       objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"],
       upgradeInsecureRequests: []
     }
   },
   crossOriginEmbedderPolicy: false,
   crossOriginResourcePolicy: { policy: 'same-origin' }
 }))
-app.use(helmet.noSniff())
-app.use(helmet.frameguard({ action: 'deny' }))
 ```
 
-**Directives CSP expliquées** :
+**Note** : `unsafe-inline` conservé pour script-src (cookie consent) et style-src (Angular Material).
 
-| Directive | Valeur | Description |
-|-----------|--------|-------------|
-| `defaultSrc` | 'self' | Par défaut, seules les ressources du même domaine sont autorisées |
-| `scriptSrc` | 'self' | Scripts uniquement depuis le même domaine (bloque unsafe-eval/inline) |
-| `styleSrc` | 'self', 'unsafe-inline' | Styles du même domaine + inline (requis par Angular) |
-| `imgSrc` | 'self', 'data:', 'https:' | Images locales, data URIs et HTTPS |
-| `fontSrc` | 'self', 'data:' | Polices locales et data URIs |
-| `connectSrc` | 'self' | Connexions XHR/fetch uniquement vers le même domaine |
-| `frameSrc` | 'self' | Iframes uniquement du même domaine |
-| `objectSrc` | 'none' | Bloque les plugins (Flash, Java, etc.) |
-| `upgradeInsecureRequests` | [] | Force HTTPS pour les ressources HTTP |
-
-### Tableau récapitulatif des corrections ZAP
-
-| Vulnérabilité ZAP | Correction | Fichier |
-|-------------------|------------|---------|
-| CSP: Wildcard Directive | Suppression de `https:` wildcard, domaines explicites | server.ts:192-211 |
-| CSP: script-src unsafe-eval | Supprimé de userProfile.ts et securityMiddleware.ts | userProfile.ts:86-91, securityMiddleware.ts:137 |
-| CSP: script-src unsafe-inline | Conservé (nécessaire pour cookie consent inline) | server.ts:196 |
-| CSP: style-src unsafe-inline | Conservé pour Angular Material | server.ts:197 |
-| CORS Wildcard | Origine restreinte + options strictes | server.ts:181-189 |
-
-### Corrections supplémentaires (v2)
-
-#### CSP img-src Wildcard corrigé
-
-**Problème** : `imgSrc: ['self', 'data:', 'https:']` permettait le chargement d'images depuis n'importe quel domaine HTTPS.
-
-**Solution** : Domaines explicitement autorisés uniquement :
-```typescript
-imgSrc: ["'self'", 'data:', 'https://gravatar.com', 'https://www.gravatar.com', 'https://i.imgur.com']
-```
-
-#### CSP userProfile.ts sécurisé
-
-**Problème** : La route `/profile` définissait une CSP vulnérable avec `'unsafe-eval'`.
-
-**Solution** : CSP stricte avec validation du domaine d'image de profil :
-```typescript
-const profileImageDomain = user?.profileImage ? new URL(user.profileImage, 'http://localhost').origin : ''
-const allowedImgSrc = profileImageDomain && profileImageDomain !== 'http://localhost'
-  ? `'self' data: ${profileImageDomain}`
-  : "'self' data:"
-const CSP = `default-src 'self'; img-src ${allowedImgSrc}; script-src 'self' https://code.getmdl.io https://ajax.googleapis.com; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'`
-```
-
-#### Directives CSP additionnelles
-
-Ajout de directives de sécurité supplémentaires :
-- `baseUri: ["'self'"]` - Empêche les attaques de base tag injection
-- `formAction: ["'self'"]` - Restreint les destinations de formulaires
-- `frameAncestors: ["'none'"]` - Protection contre le clickjacking
-
-### Note sur script-src et style-src unsafe-inline
-
-L'option `'unsafe-inline'` est conservée pour :
-- **scriptSrc** : Le script cookie consent dans `index.html` est inline
-- **styleSrc** : Angular Material injecte des styles dynamiquement
-
-Ces vulnérabilités sont de sévérité **faible** et nécessaires pour le bon fonctionnement de l'application.
-
-Pour une sécurité maximale en production, il faudrait :
-1. Utiliser des nonces ou hashes pour les scripts/styles inline
-2. Externaliser le script cookie consent
-3. Modifier la configuration Angular pour externaliser tous les styles
-
----
-
-## Protection contre les attaques DoS (Rate Limiting)
-
-### Problème identifié
-
-L'application crashait lors des tests ZAP avec une erreur "JavaScript heap out of memory" due à :
-1. Trop de requêtes simultanées non limitées
-2. Création d'objets Error pour chaque requête rejetée, causant des fuites mémoire
-
-### Corrections appliquées
-
-#### 1. Rate Limiting Global (server.ts:181-194)
+### 4. Rate Limiting
 
 ```typescript
+// Rate limiting global
 const globalRateLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 300, // 300 requêtes par minute par IP
+  windowMs: 1 * 60 * 1000,
+  max: 300,
   message: { error: 'Too many requests, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.path.startsWith('/assets/') // Skip pour les assets statiques
+  skip: (req) => req.path.startsWith('/assets/')
 })
 app.use(globalRateLimiter)
-```
 
-#### 2. Rate Limiting Strict pour endpoints sensibles (server.ts:196-207)
-
-```typescript
+// Rate limiting strict pour endpoints sensibles
 const strictRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // 10 requêtes par 15 minutes par IP
+  windowMs: 15 * 60 * 1000,
+  max: 10,
   message: { error: 'Too many attempts, please try again later.' }
 })
 app.use('/rest/user/login', strictRateLimiter)
 app.use('/rest/user/whoami', strictRateLimiter)
 app.use('/api/Users', strictRateLimiter)
+
+// Rate limiting pour accès fichiers
+const fileAccessRateLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 50,
+  message: { error: 'Too many file requests, please try again later.' }
+})
+app.use('/ftp', fileAccessRateLimiter)
 ```
 
-#### 3. Rate Limiting pour accès fichiers (server.ts:317-325)
+| Endpoint | Limite | Fenêtre | Protection |
+|----------|--------|---------|------------|
+| Global | 300 req | 1 min | DoS général |
+| `/rest/user/login` | 10 req | 15 min | Brute force |
+| `/rest/user/whoami` | 10 req | 15 min | Enumération |
+| `/api/Users` | 10 req | 15 min | Création comptes |
+| `/ftp/*` | 50 req | 1 min | Scan fichiers |
+
+### 5. Protection SSRF (Cloud Metadata)
 
 ```typescript
-const fileAccessRateLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 50, // 50 requêtes fichiers par minute par IP
-  message: { error: 'Too many file requests, please try again later.' }
-})  
-app.use('/ftp', fileAccessRateLimiter, ...)
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const blockedPatterns = [
+    /169\.254\.169\.254/,        // AWS metadata
+    /metadata\.google\.internal/, // GCP metadata
+    /169\.254\.170\.2/,          // AWS ECS metadata
+    /fd00:ec2::254/,             // AWS IPv6 metadata
+    /metadata\.azure\.internal/, // Azure metadata
+    /100\.100\.100\.200/         // Alibaba Cloud metadata
+  ]
+
+  const url = req.url + JSON.stringify(req.body || {})
+  for (const pattern of blockedPatterns) {
+    if (pattern.test(url)) {
+      return res.status(403).json({ error: 'Access to cloud metadata is blocked' })
+    }
+  }
+  next()
+})
 ```
 
-#### 4. Optimisation gestion d'erreurs (routes/fileServer.ts)
+### 6. Sécurisation Dockerfile
 
-**Problème** : Chaque requête invalide créait un objet `Error` via `next(new Error(...))`, causant une accumulation en mémoire.
+```dockerfile
+# Suppression --unsafe-perm
+RUN npm install --omit=dev
 
-**Solution** : Retourner directement une réponse JSON au lieu de créer des objets Error :
+# Audit de sécurité pendant le build
+RUN npm audit --audit-level=high --omit=dev || echo "Security audit completed"
+
+# Permissions restrictives
+RUN chmod -R 750 ftp/ frontend/dist/ data/ i18n/
+RUN chmod -R 770 logs/
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD ["/nodejs/bin/node", "-e", "require('http').get('http://localhost:3000/rest/admin/application-version', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+```
+
+### 7. Mise à jour jQuery
+
+`frontend/src/assets/public/vendor/jquery.min.js` : 2.2.4 → 3.7.1
+
+### 8. Optimisation gestion d'erreurs
+
+**Problème** : Chaque requête invalide créait un objet `Error`, causant des fuites mémoire.
 
 ```typescript
 // AVANT - Fuite mémoire
@@ -1017,59 +594,69 @@ next(new Error('Only .md and .pdf files are allowed!'))
 res.status(403).json({ error: 'Only .md and .pdf files are allowed!' })
 ```
 
-### Tableau récapitulatif Rate Limiting
+---
 
-| Endpoint | Limite | Fenêtre | Protection |
-|----------|--------|---------|------------|
-| Global (toutes routes) | 300 req | 1 min | DoS général |
-| `/rest/user/login` | 10 req | 15 min | Brute force |
-| `/rest/user/whoami` | 10 req | 15 min | Enumération |
-| `/api/Users` | 10 req | 15 min | Création comptes |
-| `/ftp/*` | 50 req | 1 min | Scan fichiers |
+## Résumé et recommandations
+
+### Fichiers modifiés
+
+| Fichier | Modifications |
+|---------|---------------|
+| `package.json` | Mise à jour dépendances, suppression packages obsolètes |
+| `Dockerfile` | Sécurisation build, healthcheck |
+| `lib/insecurity.ts` | express-jwt, jws, validation redirections, secrets externalisés |
+| `lib/securityMiddleware.ts` | **Nouveau** - Middlewares de sécurité |
+| `lib/SimpleChatBot.ts` | **Nouveau** - Remplacement juicy-chat-bot |
+| `lib/challengeUtils.ts` | html-entities v2 |
+| `data/mongodb.ts` | SecureCollection remplaçant marsdb |
+| `routes/*.ts` | Corrections injection, validation, nettoyage |
+| `server.ts` | Middlewares, CORS, CSP, rate limiting |
+
+### Tableau récapitulatif
+
+| Catégorie | Avant | Après |
+|-----------|-------|-------|
+| Dépendances critiques | 10+ vulnérables | Mises à jour/remplacées |
+| Secrets exposés | 5 secrets en clair | Variables d'environnement |
+| Injection SQL/NoSQL | Vulnérable | Requêtes paramétrées |
+| Path Traversal | Protection partielle | Middleware global |
+| CORS | Wildcard (*) | Origine restreinte |
+| CSP | Aucune | Politique stricte |
+| Rate Limiting | Aucun | Multi-niveau |
+| Docker | --unsafe-perm | Sécurisé + healthcheck |
+
+### Vulnérabilités restantes (non corrigeables)
+
+| Package | Sévérité | Raison |
+|---------|----------|--------|
+| grunt-replace-json (lodash.set) | HIGH | Outil de build uniquement, pas de correctif |
+| postcss (via stylelint) | MODERATE | Outil dev frontend |
+
+### Recommandations post-correction
+
+```bash
+# 1. Réinstaller les dépendances
+rm -rf node_modules package-lock.json
+npm install
+
+# 2. Vérifier l'audit
+npm audit
+
+# 3. Tester l'application
+npm run test
+npm run lint
+
+# 4. Rebuilder Docker
+docker build -t juice-shop-secure .
+```
+
+### Améliorations futures pour unsafe-inline
+
+Pour une sécurité maximale en production :
+1. Utiliser des nonces ou hashes pour les scripts/styles inline
+2. Externaliser le script cookie consent
+3. Modifier la configuration Angular pour externaliser les styles
 
 ---
 
-## Correction des vulnérabilités ZAP supplémentaires
-
-### 1. Vulnerable JS Library - jQuery mis à jour
-
-**Problème** : jQuery 2.2.4 contenait plusieurs vulnérabilités XSS connues (CVE-2020-11022, CVE-2020-11023).
-
-**Solution** : Mise à jour vers jQuery 3.7.1
-
-```
-frontend/src/assets/public/vendor/jquery.min.js
-Version: 2.2.4 → 3.7.1
-```
-
-### 2. Protection contre les métadonnées Cloud (SSRF)
-
-**Problème** : ZAP détectait une vulnérabilité potentielle d'accès aux métadonnées cloud.
-
-**Solution** : Middleware bloquant l'accès aux endpoints de métadonnées cloud :
-
-```typescript
-/* Block cloud metadata requests (SSRF protection) */
-app.use((req: Request, res: Response, next: NextFunction) => {
-  const blockedPatterns = [
-    /169\.254\.169\.254/,        // AWS metadata
-    /metadata\.google\.internal/, // GCP metadata
-    /169\.254\.170\.2/,          // AWS ECS metadata
-    /fd00:ec2::254/,             // AWS IPv6 metadata
-    /metadata\.azure\.internal/, // Azure metadata
-    /100\.100\.100\.200/         // Alibaba Cloud metadata
-  ]
-  // Bloque les requêtes correspondantes
-})
-```
-
-### 3. Note sur les alertes restantes
-
-| Alerte ZAP | Sévérité | Explication |
-|------------|----------|-------------|
-| CSP: script-src unsafe-inline | Faible | Requis pour le script cookie consent dans index.html |
-| CSP: style-src unsafe-inline | Faible | Requis pour Angular Material |
-| Timestamp Disclosure | Informatif | Timestamps dans les réponses API (comportement normal) |
-| ZAP is Out of Date | N/A | Concerne ZAP lui-même, pas l'application |
-
----
+*Documentation générée suite à l'audit de sécurité complet de l'application OWASP Juice Shop.*
