@@ -657,6 +657,3 @@ Pour une sécurité maximale en production :
 2. Externaliser le script cookie consent
 3. Modifier la configuration Angular pour externaliser les styles
 
----
-
-*Documentation générée suite à l'audit de sécurité complet de l'application OWASP Juice Shop.*
